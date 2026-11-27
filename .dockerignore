@@ -1,0 +1,16 @@
+bin/
+obj/
+publish/
+.vs/
+.git/
+.vercel/
+logs/
+*.user
+*.suo
+.env
+.env.*
+appsettings.Development.json
+appsettings.Local.json
+OnlineVerifyHarness/
+verify_oauth_live.py
+Data/Seed/drive_knowledge_base.json

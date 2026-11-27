@@ -1,0 +1,132 @@
+@model RouteRevisionHub.ViewModels.ResourcesLibraryViewModel
+@{
+    ViewData["Title"] = "Course Library";
+}
+
+<h1 class="h3 fw-bold mb-1">📚 Course Materials Explorer (@Model.TotalCount files)</h1>
+<p class="small text-muted-hub mb-3">Every video, audio, PPTX presentation, PDF guide, DOCX reference, SQL script, C# demo, and archive indexed directly from your local folder.</p>
+
+<form method="get" asp-action="Index" class="hub-card p-3 mb-4">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label small text-muted-hub mb-1">Search Filename or Contents</label>
+            <input type="text" name="q" value="@Model.Query" class="form-control form-control-sm hub-input" placeholder="Keyword, filename, SQL, code..." />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small text-muted-hub mb-1">Folder / Module</label>
+            <select name="moduleFolder" class="form-select form-select-sm hub-select">
+                <option value="">All Folders</option>
+                @foreach (var mf in Model.AllModules)
+                {
+                    <option value="@mf" selected="@(Model.ModuleFolder == mf)">@mf</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted-hub mb-1">Type</label>
+            <select name="resourceType" class="form-select form-select-sm hub-select">
+                <option value="">All Types</option>
+                @foreach (var rt in Model.AllTypes)
+                {
+                    <option value="@rt" selected="@(Model.ResourceType == rt)">@rt</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted-hub mb-1">Instructor</label>
+            <select name="instructor" class="form-select form-select-sm hub-select">
+                <option value="">All</option>
+                @foreach (var ins in Model.AllInstructors)
+                {
+                    <option value="@ins" selected="@(Model.Instructor == ins)">@ins</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-1">
+            <button type="submit" class="btn btn-info btn-sm text-dark fw-semibold w-100">Filter</button>
+        </div>
+    </div>
+</form>
+
+<div class="hub-card p-3 mb-3">
+    <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0" style="color:var(--text)">
+            <thead>
+                <tr class="small text-muted-hub" style="border-color:var(--border)">
+                    <th>File</th>
+                    <th>Type</th>
+                    <th>Module / Instructor</th>
+                    <th>Linked Topics</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in Model.Items)
+                {
+                    bool isMedia = r.ResourceType is "Video" or "Audio";
+                    <tr style="border-color:var(--border)">
+                        <td>
+                            <div class="fw-semibold small">@(isMedia ? "🎬 " : "📄 ")@r.FileName</div>
+                            <div class="small text-muted-hub" style="font-size:0.75rem">@r.RelativePath</div>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">@r.ResourceType</span>
+                            @if (!string.IsNullOrEmpty(r.DurationFormatted))
+                            {
+                                <div class="small text-muted-hub">@r.DurationFormatted</div>
+                            }
+                            else if (r.PageOrSlideCount > 0)
+                            {
+                                <div class="small text-muted-hub">@r.PageOrSlideCount pages</div>
+                            }
+                        </td>
+                        <td class="small">
+                            <div>@r.ModuleFolder</div>
+                            <div class="text-muted-hub">@r.Instructor</div>
+                        </td>
+                        <td class="small">
+                            @foreach (var tr in r.TopicRefs.OrderByDescending(x => x.RelevanceScore).Take(2))
+                            {
+                                <a asp-controller="Topics" asp-action="Details" asp-route-id="@tr.Topic.Slug" class="badge bg-dark border text-info text-decoration-none me-1">
+                                    @tr.Topic.TitleEn
+                                </a>
+                            }
+                        </td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                @if (isMedia)
+                                {
+                                    <button type="button" onclick="openVideoModal(@r.Id, 0)" class="btn btn-sm btn-success">Play & OCR</button>
+                                }
+                                else
+                                {
+                                    <button type="button" onclick="openPreviewModal(@r.Id)" class="btn btn-sm btn-info text-dark fw-semibold">Preview</button>
+                                }
+                                <button type="button" onclick="revealResource(@r.Id)" class="btn btn-sm btn-outline-secondary">Folder</button>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (Model.TotalPages > 1)
+{
+    <nav class="d-flex justify-content-between align-items-center">
+        <span class="small text-muted-hub">Page @Model.Page of @Model.TotalPages</span>
+        <div class="d-flex gap-1">
+            @if (Model.Page > 1)
+            {
+                <a class="btn btn-sm btn-outline-secondary" asp-action="Index" asp-route-q="@Model.Query" asp-route-moduleFolder="@Model.ModuleFolder"
+                   asp-route-resourceType="@Model.ResourceType" asp-route-instructor="@Model.Instructor" asp-route-page="@(Model.Page - 1)">← Prev</a>
+            }
+            @if (Model.Page < Model.TotalPages)
+            {
+                <a class="btn btn-sm btn-outline-info" asp-action="Index" asp-route-q="@Model.Query" asp-route-moduleFolder="@Model.ModuleFolder"
+                   asp-route-resourceType="@Model.ResourceType" asp-route-instructor="@Model.Instructor" asp-route-page="@(Model.Page + 1)">Next →</a>
+            }
+        </div>
+    </nav>
+}

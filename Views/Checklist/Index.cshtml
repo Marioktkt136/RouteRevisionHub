@@ -1,0 +1,305 @@
+@model RouteRevisionHub.Controllers.ChecklistViewModel
+@{
+    ViewData["Title"] = "Course Study Checklist";
+}
+
+<!-- Hero Progress Bar -->
+<div class="hub-card p-4 mb-4" style="background:linear-gradient(135deg, rgba(16,185,129,0.14), rgba(56,189,248,0.12)), var(--bg-card)">
+    <div class="row g-3 align-items-center">
+        <div class="col-lg-7">
+            <span class="badge bg-success mb-2">Interactive Study Tracker · متابعة الإنجاز في الكورس</span>
+            <h1 class="h3 fw-bold mb-1">✓ Route Backend Revision Checklist</h1>
+            <p class="small text-muted-hub rtl-ar mb-0">
+                علّم على كل خطوة بتخلصها في كل Topic (فيديوهات، سلايدز ومفاتيح، تطبيق وأسئلة) — أول ما الـ 3 خطوات يكتملوا بيتحول التوبيك تلقائياً إلى <strong>Mastered</strong> وتقدر تتابع كل الواجبات والامتحانات هنا.
+            </p>
+        </div>
+        <div class="col-lg-5">
+            <div class="p-3 rounded border" style="border-color:var(--border)!important;background:var(--bg)">
+                <div class="d-flex justify-content-between align-items-baseline mb-1">
+                    <span class="small fw-semibold">Overall Completion</span>
+                    <span id="clOverallPct" class="h4 fw-bold text-success mb-0">@Model.OverallPercent%</span>
+                </div>
+                <div class="progress mb-2" style="height:12px;background:var(--bg-elev)">
+                    <div id="clOverallBar" class="progress-bar bg-success progress-bar-striped progress-bar-animated" style="width:@Model.OverallPercent%"></div>
+                </div>
+                <div class="d-flex flex-wrap justify-content-between small text-muted-hub gap-2">
+                    <span>Mastered: <strong id="clMasteredTopics" class="text-info">@Model.MasteredTopics</strong>/@Model.TotalTopics Topics</span>
+                    <span>Checkpoints: <strong id="clStepsDone" class="text-warning">@Model.CompletedSteps</strong>/@Model.TotalSteps</span>
+                    <span>Labs & Exams: <strong id="clTasksDone" class="text-success">@Model.CompletedTasks</strong>/@Model.TotalTasks</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filter & Navigation Bar -->
+<form method="get" asp-action="Index" class="hub-card p-3 mb-4">
+    <div class="row g-2 align-items-center">
+        <div class="col-lg-6 d-flex flex-wrap gap-2">
+            @{
+                string BtnCls(string f) => Model.Filter == f ? "btn btn-sm btn-info text-dark fw-semibold" : "btn btn-sm btn-outline-secondary";
+            }
+            <a asp-action="Index" asp-route-filter="all" asp-route-moduleId="@Model.ModuleId" class="@BtnCls("all")">All Topics</a>
+            <a asp-action="Index" asp-route-filter="remaining" asp-route-moduleId="@Model.ModuleId" class="@BtnCls("remaining")">⏳ Remaining (المتبقي)</a>
+            <a asp-action="Index" asp-route-filter="inprogress" asp-route-moduleId="@Model.ModuleId" class="@BtnCls("inprogress")">🔥 In Progress / Review</a>
+            <a asp-action="Index" asp-route-filter="mastered" asp-route-moduleId="@Model.ModuleId" class="@BtnCls("mastered")">✓ Mastered</a>
+        </div>
+        <div class="col-lg-4">
+            <select name="moduleId" class="form-select form-select-sm hub-select" onchange="this.form.submit()">
+                <option value="">All Modules</option>
+                @foreach (var m in Model.AllModules)
+                {
+                    <option value="@m.Id" selected="@(Model.ModuleId == m.Id)">@m.Code - @m.TitleEn</option>
+                }
+            </select>
+            <input type="hidden" name="filter" value="@Model.Filter" />
+        </div>
+        <div class="col-lg-2 text-end">
+            <a asp-action="Index" class="btn btn-sm btn-outline-secondary w-100">Reset Filters</a>
+        </div>
+    </div>
+</form>
+
+<div class="row g-4">
+    <!-- Left 8 Columns: Curriculum 3-Step Track Checklist -->
+    <div class="col-lg-8">
+        @if (!Model.VisibleModules.Any())
+        {
+            <div class="hub-card p-4 text-center text-muted-hub">
+                No topics match the selected filter! <a asp-action="Index" class="text-info">Show all topics</a>.
+            </div>
+        }
+
+        @foreach (var mod in Model.VisibleModules)
+        {
+            int modSteps = mod.Topics.Sum(t =>
+                (t.Progress?.VideoWatched == true ? 1 : 0) +
+                (t.Progress?.SlidesReviewed == true ? 1 : 0) +
+                (t.Progress?.PracticeDone == true ? 1 : 0));
+            int modMaxSteps = mod.Topics.Count * 3;
+            int modPct = modMaxSteps == 0 ? 0 : (int)Math.Round(modSteps * 100.0 / modMaxSteps);
+            int modMastered = mod.Topics.Count(t => t.Progress?.Status == "Mastered");
+
+            <div class="hub-card p-3 mb-3" id="modCard_@mod.Id">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 pb-2 border-bottom" style="border-color:var(--border)!important">
+                    <div>
+                        <span class="badge me-1" style="background:@(mod.BadgeColor)22;color:@mod.BadgeColor;border:1px solid @(mod.BadgeColor)55">Module @mod.Code</span>
+                        <strong class="h6 mb-0">@mod.TitleEn</strong>
+                        <span class="small text-info ms-2">@mod.TitleAr</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 small">
+                        <span class="text-muted-hub"><strong id="modMastered_@mod.Id">@modMastered</strong>/@mod.Topics.Count mastered</span>
+                        <span id="modPctBadge_@mod.Id" class="badge bg-dark border text-success">@modPct%</span>
+                    </div>
+                </div>
+                <div class="progress mb-3" style="height:5px;background:var(--bg)">
+                    <div id="modBar_@mod.Id" class="progress-bar" style="width:@modPct%;background:@mod.BadgeColor"></div>
+                </div>
+
+                <div class="d-flex flex-column gap-2">
+                    @foreach (var t in mod.Topics)
+                    {
+                        var p = t.Progress;
+                        bool v = p?.VideoWatched ?? false;
+                        bool s = p?.SlidesReviewed ?? false;
+                        bool pr = p?.PracticeDone ?? false;
+                        bool allDone = v && s && pr;
+                        string st = p?.Status ?? "NotStarted";
+                        int vids = t.SourceRefs.Count(r => r.CourseResource.ResourceType is "Video" or "Audio");
+
+                        <div id="topicRow_@t.Id" class="p-2 px-3 rounded border @(allDone ? "border-success" : "")"
+                             style="border-color:@(allDone ? "var(--success)" : "var(--border)")!important;background:@(allDone ? "rgba(52,211,153,0.07)" : "var(--bg)")">
+                            <div class="row g-2 align-items-center">
+                                <div class="col-xl-5">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span id="rowStatus_@t.Id" class="badge badge-status-@st" style="font-size:0.68rem">@st</span>
+                                        <a asp-controller="Topics" asp-action="Details" asp-route-id="@t.Slug" class="fw-semibold small text-decoration-none" style="color:var(--text)">
+                                            @t.TitleEn
+                                        </a>
+                                    </div>
+                                    <div class="small text-muted-hub mt-1" style="font-size:0.74rem">
+                                        @t.SessionLabel · 🎬 @vids videos · 🔑 @t.ConventionKeys.Count keys
+                                    </div>
+                                </div>
+                                <div class="col-xl-7 d-flex flex-wrap justify-content-xl-end align-items-center gap-2">
+                                    <label class="form-check form-check-inline m-0 px-2 py-1 rounded border small" style="border-color:var(--border)!important;cursor:pointer">
+                                        <input class="form-check-input cl-chk-@t.Id" id="chkVid_@t.Id" type="checkbox" checked="@v"
+                                               onchange="toggleTopicStep(@t.Id, 'video', this.checked)" />
+                                        <span class="ms-1">🎬 Videos</span>
+                                    </label>
+                                    <label class="form-check form-check-inline m-0 px-2 py-1 rounded border small" style="border-color:var(--border)!important;cursor:pointer">
+                                        <input class="form-check-input cl-chk-@t.Id" id="chkSld_@t.Id" type="checkbox" checked="@s"
+                                               onchange="toggleTopicStep(@t.Id, 'slides', this.checked)" />
+                                        <span class="ms-1">📖 Slides/Keys</span>
+                                    </label>
+                                    <label class="form-check form-check-inline m-0 px-2 py-1 rounded border small" style="border-color:var(--border)!important;cursor:pointer">
+                                        <input class="form-check-input cl-chk-@t.Id" id="chkPrc_@t.Id" type="checkbox" checked="@pr"
+                                               onchange="toggleTopicStep(@t.Id, 'practice', this.checked)" />
+                                        <span class="ms-1">💻 Code/Quiz</span>
+                                    </label>
+                                    <label class="form-check form-check-inline m-0 px-2 py-1 rounded border border-success small text-success fw-semibold" style="cursor:pointer">
+                                        <input class="form-check-input" id="chkAll_@t.Id" type="checkbox" checked="@allDone"
+                                               onchange="toggleTopicStep(@t.Id, 'all', this.checked)" />
+                                        <span class="ms-1">All</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Right 4 Columns: Assignments, Workshops, Exams & Personal To-Do Checklist -->
+    <div class="col-lg-4">
+        <div class="hub-card p-3 sticky-top" style="top:74px;z-index:10">
+            <h2 class="h5 fw-bold mb-1">🎯 Assignments, Labs & Exams</h2>
+            <p class="small text-muted-hub rtl-ar mb-3">واجبات التراك، الامتحانات العملية، وأي مهام إضافية تضيفها لنفسك</p>
+
+            <!-- Quick Add Custom Task -->
+            <div class="p-2 rounded border mb-3" style="border-color:var(--border)!important;background:var(--bg)">
+                <input id="newTaskTitle" type="text" class="form-control form-control-sm hub-input mb-2" placeholder="Add task (e.g. حل سؤال 38 Indexed View)..." />
+                <div class="row g-1 mb-2">
+                    <div class="col-6">
+                        <select id="newTaskCat" class="form-select form-select-sm hub-select">
+                            <option value="Assignment">Assignment</option>
+                            <option value="Workshop">Workshop</option>
+                            <option value="Exam">Exam</option>
+                            <option value="Interview Prep">Interview Prep</option>
+                            <option value="Custom" selected>Custom Task</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <select id="newTaskMod" class="form-select form-select-sm hub-select">
+                            <option value="">General</option>
+                            @foreach (var m in Model.AllModules)
+                            {
+                                <option value="@m.Id">@m.Code - @m.TitleEn</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <button type="button" onclick="addCustomTask()" class="btn btn-sm btn-success w-100 fw-semibold">＋ Add Checklist Item</button>
+            </div>
+
+            <div class="d-flex flex-column gap-2" style="max-height:60vh;overflow-y:auto" id="customTasksList">
+                @foreach (var task in Model.Tasks)
+                {
+                    <div id="ctask_@task.Id" class="p-2 rounded border d-flex justify-content-between align-items-start gap-2 @(task.IsCompleted ? "border-success" : "")"
+                         style="border-color:@(task.IsCompleted ? "var(--success)" : "var(--border)")!important;background:var(--bg)">
+                        <label class="d-flex align-items-start gap-2 m-0 flex-grow-1" style="cursor:pointer">
+                            <input type="checkbox" class="form-check-input mt-1 flex-shrink-0" checked="@task.IsCompleted"
+                                   onchange="toggleCustomTask(@task.Id)" />
+                            <div>
+                                <div class="small fw-semibold @(task.IsCompleted ? "text-decoration-line-through text-muted-hub" : "")" id="ctaskTitle_@task.Id">
+                                    @task.Title
+                                </div>
+                                <div class="d-flex flex-wrap gap-1 mt-1">
+                                    <span class="badge bg-secondary" style="font-size:0.65rem">@task.Category</span>
+                                    @if (task.TrackModule != null)
+                                    {
+                                        <span class="badge bg-dark border text-info" style="font-size:0.65rem">@task.TrackModule.Code</span>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(task.SourceHint))
+                                    {
+                                        <span class="text-muted-hub" style="font-size:0.68rem" title="@task.SourceHint">📁 @System.IO.Path.GetFileName(task.SourceHint.TrimEnd('\\'))</span>
+                                    }
+                                </div>
+                            </div>
+                        </label>
+                        <button type="button" onclick="deleteCustomTask(@task.Id)" class="btn btn-sm btn-link text-danger p-0 text-decoration-none" title="Delete">×</button>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function applySummaryUpdate(summary) {
+    if (!summary) return;
+    document.getElementById("clOverallPct").textContent = summary.overallPercent + "%";
+    document.getElementById("clOverallBar").style.width = summary.overallPercent + "%";
+    document.getElementById("clMasteredTopics").textContent = summary.masteredTopics;
+    document.getElementById("clStepsDone").textContent = summary.completedSteps;
+    document.getElementById("clTasksDone").textContent = summary.completedTasks;
+
+    if (summary.moduleId) {
+        const bar = document.getElementById("modBar_" + summary.moduleId);
+        const pct = document.getElementById("modPctBadge_" + summary.moduleId);
+        const mCnt = document.getElementById("modMastered_" + summary.moduleId);
+        if (bar) bar.style.width = summary.modulePercent + "%";
+        if (pct) pct.textContent = summary.modulePercent + "%";
+        if (mCnt) mCnt.textContent = summary.moduleMastered;
+    }
+}
+
+async function toggleTopicStep(topicId, step, checked) {
+    const resp = await fetch("/api/checklist/topic-step", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topicId, step, checked })
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+
+    document.getElementById("chkVid_" + topicId).checked = data.videoWatched;
+    document.getElementById("chkSld_" + topicId).checked = data.slidesReviewed;
+    document.getElementById("chkPrc_" + topicId).checked = data.practiceDone;
+    const allDone = data.videoWatched && data.slidesReviewed && data.practiceDone;
+    document.getElementById("chkAll_" + topicId).checked = allDone;
+
+    const badge = document.getElementById("rowStatus_" + topicId);
+    if (badge) {
+        badge.className = "badge badge-status-" + data.status;
+        badge.textContent = data.status;
+    }
+    const row = document.getElementById("topicRow_" + topicId);
+    if (row) {
+        row.style.borderColor = allDone ? "var(--success)" : "var(--border)";
+        row.style.background = allDone ? "rgba(52,211,153,0.07)" : "var(--bg)";
+    }
+    applySummaryUpdate(data.summary);
+}
+
+async function addCustomTask() {
+    const titleEl = document.getElementById("newTaskTitle");
+    const title = titleEl.value.trim();
+    if (!title) return;
+    const modVal = document.getElementById("newTaskMod").value;
+    const resp = await fetch("/api/checklist/custom", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            trackModuleId: modVal ? parseInt(modVal, 10) : null,
+            title,
+            category: document.getElementById("newTaskCat").value
+        })
+    });
+    if (resp.ok) location.reload();
+}
+
+async function toggleCustomTask(id) {
+    const resp = await fetch(`/api/checklist/custom/${id}/toggle`, { method: "POST" });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const card = document.getElementById("ctask_" + id);
+    const titleEl = document.getElementById("ctaskTitle_" + id);
+    if (card) card.style.borderColor = data.isCompleted ? "var(--success)" : "var(--border)";
+    if (titleEl) {
+        titleEl.classList.toggle("text-decoration-line-through", data.isCompleted);
+        titleEl.classList.toggle("text-muted-hub", data.isCompleted);
+    }
+    applySummaryUpdate(data.summary);
+}
+
+async function deleteCustomTask(id) {
+    const resp = await fetch(`/api/checklist/custom/${id}`, { method: "DELETE" });
+    if (resp.ok) {
+        document.getElementById("ctask_" + id)?.remove();
+    }
+}
+</script>
+}

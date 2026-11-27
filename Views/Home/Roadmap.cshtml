@@ -1,0 +1,135 @@
+@model RouteRevisionHub.ViewModels.RoadmapViewModel
+@{
+    ViewData["Title"] = "Topics Roadmap";
+    var allModules = (List<RouteRevisionHub.Models.Entities.TrackModule>)ViewBag.AllModules;
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+        <h1 class="h3 fw-bold mb-0">Full Curriculum Roadmap · خريطة التوبكس</h1>
+        <small class="text-muted-hub">All sessions, convention keys, quick reviews, and exact video/file citations</small>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-controller="Expand" asp-action="Index" class="btn btn-sm btn-info text-dark fw-semibold">＋ Add Topic / Sync Folder</a>
+    </div>
+</div>
+
+<form method="get" asp-action="Roadmap" class="hub-card p-3 mb-4">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label small text-muted-hub mb-1">Track Module</label>
+            <select name="moduleId" class="form-select form-select-sm hub-select">
+                <option value="">All Modules</option>
+                @foreach (var m in allModules)
+                {
+                    <option value="@m.Id" selected="@(Model.SelectedModuleId == m.Id)">@m.Code - @m.TitleEn</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted-hub mb-1">Study Status</label>
+            <select name="status" class="form-select form-select-sm hub-select">
+                <option value="">All Statuses</option>
+                @foreach (var st in new[] { "NotStarted", "InProgress", "NeedsReview", "Mastered" })
+                {
+                    <option value="@st" selected="@(Model.SelectedStatus == st)">@st</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted-hub mb-1">Priority</label>
+            <select name="priority" class="form-select form-select-sm hub-select">
+                <option value="">All Priorities</option>
+                @foreach (var pr in new[] { "InterviewCritical", "Core", "Advanced", "Upcoming" })
+                {
+                    <option value="@pr" selected="@(Model.SelectedPriority == pr)">@pr</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small text-muted-hub mb-1">Filter Topic or Convention Key</label>
+            <input type="text" name="q" value="@Model.Query" class="form-control form-control-sm hub-input" placeholder="e.g. AsNoTracking, Virtual, CTE..." />
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+            <button type="submit" class="btn btn-info btn-sm text-dark fw-semibold flex-grow-1">Filter</button>
+            <a asp-action="Roadmap" class="btn btn-outline-secondary btn-sm">Reset</a>
+        </div>
+    </div>
+</form>
+
+@if (!Model.Modules.Any())
+{
+    <div class="hub-card p-4 text-center text-muted-hub">
+        No topics matched your filter criteria. <a asp-action="Roadmap" class="text-info">Reset filters</a>.
+    </div>
+}
+
+@foreach (var mod in Model.Modules)
+{
+    var mastered = mod.Topics.Count(t => t.Progress?.Status == "Mastered");
+    <div class="mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 pb-2 border-bottom" style="border-color:var(--border)!important">
+            <div>
+                <span class="badge me-2" style="background:@(mod.BadgeColor)22;color:@mod.BadgeColor;border:1px solid @(mod.BadgeColor)55">Module @mod.Code</span>
+                <span class="h5 fw-bold align-middle">@mod.TitleEn</span>
+                <span class="ms-2 small text-info">@mod.TitleAr</span>
+                @if (mod.IsUpcoming)
+                {
+                    <span class="badge bg-secondary ms-2">Upcoming Student Guide</span>
+                }
+            </div>
+            <div class="small text-muted-hub">
+                @mod.Topics.Count topics · @mastered mastered · @(mod.IsUpcoming ? "Syllabus Preview" : $"{mod.TotalVideoCount} videos ({mod.TotalVideoHours:0.#}h)")
+            </div>
+        </div>
+
+        <div class="row g-3">
+            @foreach (var topic in mod.Topics)
+            {
+                var status = topic.Progress?.Status ?? "NotStarted";
+                var vidCount = topic.SourceRefs.Count(s => s.CourseResource.ResourceType is "Video" or "Audio");
+                var docCount = topic.SourceRefs.Count - vidCount;
+                <div class="col-md-6 col-xl-4">
+                    <div class="hub-card hub-card-hover p-3 h-100 d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                                <span class="small text-muted-hub">@topic.SessionLabel</span>
+                                <div class="d-flex gap-1">
+                                    <span class="badge badge-priority-@topic.Priority">@topic.Priority</span>
+                                    <span class="badge badge-status-@status">@status</span>
+                                </div>
+                            </div>
+                            <a asp-controller="Topics" asp-action="Details" asp-route-id="@topic.Slug" class="text-decoration-none" style="color:var(--text)">
+                                <h3 class="h6 fw-bold mb-1">@topic.TitleEn</h3>
+                            </a>
+                            <div class="small text-muted-hub rtl-ar mb-2">@topic.TitleAr</div>
+
+                            @if (topic.ConventionKeys.Any())
+                            {
+                                <div class="d-flex flex-wrap gap-1 mb-2">
+                                    @foreach (var k in topic.ConventionKeys.OrderByDescending(x => x.IsCritical).Take(5))
+                                    {
+                                        <span class="key-pill @(k.IsCritical ? "critical" : "")" title="@k.ShortRule">@k.KeyName</span>
+                                    }
+                                    @if (topic.ConventionKeys.Count > 5)
+                                    {
+                                        <span class="key-pill">+@(topic.ConventionKeys.Count - 5) more</span>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        <div class="pt-2 mt-2 border-top d-flex justify-content-between align-items-center" style="border-color:var(--border)!important">
+                            <div class="small text-muted-hub">
+                                🎬 @vidCount · 📄 @docCount · ❓ @topic.Questions.Count
+                            </div>
+                            <a asp-controller="Topics" asp-action="Details" asp-route-id="@topic.Slug" class="btn btn-sm btn-outline-info">
+                                Quick Review →
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}

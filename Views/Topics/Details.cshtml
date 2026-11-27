@@ -1,0 +1,578 @@
+@model RouteRevisionHub.ViewModels.TopicDetailViewModel
+@{
+    var t = Model.Topic;
+    ViewData["Title"] = t.TitleEn;
+    var prog = t.Progress ?? new RouteRevisionHub.Models.Entities.TopicProgress();
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div class="d-flex align-items-center gap-2 small">
+        <a asp-controller="Home" asp-action="Roadmap" asp-route-moduleId="@t.TrackModuleId" class="text-info text-decoration-none">
+            ← @t.TrackModule.TitleEn
+        </a>
+        <span class="text-muted-hub">/</span>
+        <span class="text-muted-hub">@t.SessionLabel</span>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="collapse" data-bs-target="#editTopicPanel">✎ Edit Topic</button>
+        @if (Model.PreviousTopic != null)
+        {
+            <a asp-action="Details" asp-route-id="@Model.PreviousTopic.Slug" class="btn btn-sm btn-outline-secondary" title="@Model.PreviousTopic.TitleEn">← Prev Topic</a>
+        }
+        @if (Model.NextTopic != null)
+        {
+            <a asp-action="Details" asp-route-id="@Model.NextTopic.Slug" class="btn btn-sm btn-outline-info" title="@Model.NextTopic.TitleEn">Next Topic →</a>
+        }
+    </div>
+</div>
+
+<!-- Inline Edit Topic Panel -->
+<div class="collapse mb-4" id="editTopicPanel">
+    <div class="hub-card p-4 border-warning">
+        <h3 class="h6 fw-bold text-warning mb-3">✎ Edit Topic Content</h3>
+        <div class="row g-2">
+            <div class="col-md-5">
+                <label class="form-label small text-muted-hub mb-1">English Title</label>
+                <input id="edTitleEn" type="text" class="form-control form-control-sm hub-input" value="@t.TitleEn" />
+            </div>
+            <div class="col-md-5">
+                <label class="form-label small text-muted-hub mb-1">Arabic Title</label>
+                <input id="edTitleAr" type="text" class="form-control form-control-sm hub-input" value="@t.TitleAr" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted-hub mb-1">Priority</label>
+                <select id="edPriority" class="form-select form-select-sm hub-select">
+                    @foreach (var pr in new[] { "InterviewCritical", "Core", "Advanced", "Upcoming" })
+                    {
+                        <option value="@pr" selected="@(t.Priority == pr)">@pr</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small text-muted-hub mb-1">Session Label</label>
+                <input id="edSession" type="text" class="form-control form-control-sm hub-input" value="@t.SessionLabel" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small text-muted-hub mb-1">Code Language</label>
+                <select id="edLang" class="form-select form-select-sm hub-select">
+                    @foreach (var lg in new[] { "csharp", "sql", "cshtml", "http" })
+                    {
+                        <option value="@lg" selected="@(t.CodeLanguage == lg)">@lg</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12">
+                <label class="form-label small text-muted-hub mb-1">Arabic Quick Review Summary</label>
+                <textarea id="edSumAr" rows="3" class="form-control form-control-sm hub-input rtl-ar">@t.SummaryAr</textarea>
+            </div>
+            <div class="col-12">
+                <label class="form-label small text-muted-hub mb-1">Technical Takeaways</label>
+                <textarea id="edSumEn" rows="3" class="form-control form-control-sm hub-input">@t.SummaryEn</textarea>
+            </div>
+            <div class="col-12">
+                <label class="form-label small text-muted-hub mb-1">Code / SQL Pattern</label>
+                <textarea id="edCode" rows="4" class="form-control form-control-sm hub-input ltr-code">@t.CodeSnippet</textarea>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small text-muted-hub mb-1">Common Mistakes</label>
+                <textarea id="edMistakes" rows="3" class="form-control form-control-sm hub-input">@t.CommonMistakes</textarea>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small text-muted-hub mb-1">Interview Questions</label>
+                <textarea id="edInterview" rows="3" class="form-control form-control-sm hub-input">@t.InterviewQuestions</textarea>
+            </div>
+        </div>
+        <div class="mt-3 d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-sm btn-secondary" data-bs-toggle="collapse" data-bs-target="#editTopicPanel">Cancel</button>
+            <button type="button" onclick="saveTopicEdits(@t.Id)" class="btn btn-sm btn-warning fw-semibold">Save Topic Changes</button>
+        </div>
+    </div>
+</div>
+
+<!-- Topic Hero & Progress Tracker -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-8">
+        <div class="hub-card p-4 h-100">
+            <div class="d-flex flex-wrap gap-2 mb-2">
+                <span class="badge" style="background:@(t.TrackModule.BadgeColor)22;color:@t.TrackModule.BadgeColor;border:1px solid @(t.TrackModule.BadgeColor)55">Module @t.TrackModule.Code</span>
+                <span class="badge badge-priority-@t.Priority">@t.Priority</span>
+                <span class="badge badge-status-@prog.Status">@prog.Status</span>
+            </div>
+            <h1 class="h3 fw-bold mb-1">@t.TitleEn</h1>
+            <h2 class="h5 text-info rtl-ar mb-3">@t.TitleAr</h2>
+
+            <div class="p-3 rounded mb-3" style="background:var(--bg);border:1px solid var(--border)">
+                <div class="small text-uppercase fw-bold text-info mb-1">الملخص السريع (Arabic Quick Review)</div>
+                <div class="rtl-ar" style="white-space:pre-line">@t.SummaryAr</div>
+            </div>
+
+            <div class="p-3 rounded" style="background:var(--bg);border:1px solid var(--border)">
+                <div class="small text-uppercase fw-bold text-warning mb-1">Technical Key Takeaways</div>
+                <div style="white-space:pre-line">@t.SummaryEn</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="hub-card p-3 h-100 d-flex flex-column justify-content-between">
+            <div>
+                <h3 class="h6 fw-bold mb-3">📌 Study Tracker & Personal Notes</h3>
+                <div class="mb-2">
+                    <label class="form-label small text-muted-hub mb-1">Status</label>
+                    <select id="progStatusSelect" class="form-select form-select-sm hub-select">
+                        @foreach (var s in new[] { "NotStarted", "InProgress", "NeedsReview", "Mastered" })
+                        {
+                            <option value="@s" selected="@(prog.Status == s)">@s</option>
+                        }
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small text-muted-hub mb-1">Confidence Level: <strong id="confVal">@prog.ConfidenceLevel</strong> / 5</label>
+                    <input id="progConfidenceRange" type="range" class="form-range" min="1" max="5" value="@prog.ConfidenceLevel"
+                           oninput="document.getElementById('confVal').textContent=this.value" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small text-muted-hub mb-1">Personal Revision Notes</label>
+                    <textarea id="progUserNotes" rows="5" class="form-control form-control-sm hub-input" placeholder="اكتب ملاحظاتك أو الحاجات اللي بتتلخبط فيها هنا...">@prog.UserNotes</textarea>
+                </div>
+            </div>
+            <div>
+                <button type="button" onclick="saveTopicProgress(@t.Id, true)" class="btn btn-info btn-sm text-dark fw-semibold w-100">
+                    Save & Mark Reviewed (Reviews: @prog.ReviewCount)
+                </button>
+                <div id="progSaveIndicator" class="small text-success mt-2 d-none"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Convention Keys Cheat Sheet -->
+<section id="conventions" class="hub-card p-4 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h3 class="h5 fw-bold mb-0">🔑 Convention Keys & Syntax Rules (@t.ConventionKeys.Count)</h3>
+            <span class="small text-muted-hub">Core keywords, EF/SQL/MVC rules & gotchas for this topic</span>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="collapse" data-bs-target="#addKeyPanel">＋ Add Key</button>
+    </div>
+
+    <div class="collapse mb-3" id="addKeyPanel">
+        <div class="p-3 rounded border border-info" style="background:var(--bg)">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small text-muted-hub mb-1">Key Name</label>
+                    <input id="nkName" type="text" class="form-control form-control-sm hub-input" placeholder="e.g. [ApiController]" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small text-muted-hub mb-1">Category</label>
+                    <input id="nkCat" type="text" class="form-control form-control-sm hub-input" value="Syntax" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small text-muted-hub mb-1">Rule / Behavior</label>
+                    <input id="nkRule" type="text" class="form-control form-control-sm hub-input" placeholder="Short rule explanation..." />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small text-muted-hub mb-1">Example (Optional)</label>
+                    <input id="nkEx" type="text" class="form-control form-control-sm hub-input ltr-code" placeholder="snippet" />
+                </div>
+                <div class="col-md-1">
+                    <button type="button" onclick="addTopicKey(@t.Id)" class="btn btn-sm btn-info text-dark fw-semibold w-100">Add</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    @if (!t.ConventionKeys.Any())
+    {
+        <div class="text-muted-hub small">No separate convention keys logged for this topic.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0" style="color:var(--text)">
+                <thead>
+                    <tr class="text-muted-hub small" style="border-color:var(--border)">
+                        <th>Convention / Key</th>
+                        <th>Category</th>
+                        <th>Rule / Behavior</th>
+                        <th>Example</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var ck in t.ConventionKeys)
+                    {
+                        <tr style="border-color:var(--border)">
+                            <td><span class="key-pill @(ck.IsCritical ? "critical" : "")">@ck.KeyName</span></td>
+                            <td><span class="badge bg-secondary">@ck.Category</span></td>
+                            <td class="small">@ck.ShortRule</td>
+                            <td class="small ltr-code">@if (!string.IsNullOrEmpty(ck.ExampleSnippet)){<code>@ck.ExampleSnippet</code>}</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+<!-- Code Snippet + Mistakes / Interview Questions -->
+<div class="row g-4 mb-4">
+    @if (!string.IsNullOrWhiteSpace(t.CodeSnippet))
+    {
+        <div class="col-lg-7">
+            <div class="hub-card p-4 h-100 code-wrapper">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h3 class="h5 fw-bold mb-0">💻 Pattern & Code Example (@t.CodeLanguage.ToUpperInvariant())</h3>
+                    <button type="button" onclick="copyCodeBlock(this)" class="btn btn-sm btn-outline-info">Copy</button>
+                </div>
+                <pre class="code-box ltr-code"><code>@t.CodeSnippet</code></pre>
+            </div>
+        </div>
+    }
+
+    <div class="@(string.IsNullOrWhiteSpace(t.CodeSnippet) ? "col-12" : "col-lg-5")">
+        <div class="hub-card p-4 h-100">
+            <h3 class="h5 fw-bold text-danger mb-2">⚠️ Common Mistakes & Traps</h3>
+            <div class="small mb-3" style="white-space:pre-line">@t.CommonMistakes</div>
+            <hr style="border-color:var(--border)" />
+            <h3 class="h5 fw-bold text-warning mb-2">🎯 Interview Questions</h3>
+            <div class="small" style="white-space:pre-line">@t.InterviewQuestions</div>
+        </div>
+    </div>
+</div>
+
+<!-- Exact Citations: Where in Videos, Slides, Docs, SQL, Code -->
+<section id="citations" class="hub-card p-4 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <div>
+            <h3 class="h5 fw-bold mb-1">📌 مذكور في اني فايل واني فيديو بالظبط (Exact Material Citations)</h3>
+            <p class="small text-muted-hub mb-0">Every link below is automatically matched & verified from your course folder (slides, PDFs, DOCX guides, SQL/C# demos, and video frame OCR timestamps).</p>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="collapse" data-bs-target="#addCitationPanel">＋ Link File / Video</button>
+    </div>
+
+    <div class="collapse mb-3 mt-2" id="addCitationPanel">
+        <div class="p-3 rounded border border-success" style="background:var(--bg)">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label small text-muted-hub mb-1">1. Search Any File / Video in Course</label>
+                    <input id="citSearchInput" type="text" class="form-control form-control-sm hub-input" placeholder="Type filename or keyword..." oninput="lookupCourseResources(this.value)" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small text-muted-hub mb-1">2. Select Resource</label>
+                    <select id="citResourceSelect" class="form-select form-select-sm hub-select"></select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small text-muted-hub mb-1">Timestamp / Slide</label>
+                    <input id="citLocation" type="text" class="form-control form-control-sm hub-input" placeholder="04:15 or Slide 08" />
+                </div>
+                <div class="col-md-2">
+                    <button type="button" onclick="attachTopicCitation(@t.Id)" class="btn btn-sm btn-success w-100 fw-semibold">Link Citation</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <ul class="nav nav-tabs mb-3" style="border-color:var(--border)">
+        <li class="nav-item">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabVideos" type="button">🎬 Videos & Audio (@Model.VideoRefs.Count)</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabDocs" type="button">📄 Slides, PDFs & Guides (@Model.DocAndSlideRefs.Count)</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabCode" type="button">🗄️ SQL, C# Code & Archives (@Model.CodeAndSqlRefs.Count)</button>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="tabVideos">
+            @if (!Model.VideoRefs.Any())
+            {
+                <div class="text-muted-hub small">No direct videos matched for this topic (or upcoming track).</div>
+            }
+            @foreach (var sr in Model.VideoRefs)
+            {
+                var r = sr.CourseResource;
+                int startSec = sr.FirstTimestampSeconds ?? 0;
+                <div class="p-3 mb-2 rounded border" style="border-color:var(--border)!important;background:var(--bg)">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                        <div>
+                            <div class="fw-bold">
+                                @(sr.IsPrimary ? "⭐ " : "")@r.FileName
+                                <span class="badge bg-secondary ms-1">@r.DurationFormatted</span>
+                                <span class="badge bg-dark border ms-1">@r.Instructor</span>
+                            </div>
+                            <div class="small text-muted-hub">@r.RelativePath</div>
+                            <div class="small text-info mt-1">@sr.MatchReason</div>
+                        </div>
+                        <div class="d-flex flex-wrap gap-1">
+                            <button type="button" onclick="openVideoModal(@r.Id, @startSec)" class="btn btn-sm btn-success">
+                                ▶ Play @(startSec > 0 ? $"@ {TimeSpan.FromSeconds(startSec):mm\\:ss}" : "Video")
+                            </button>
+                            <button type="button" onclick="openExternalResource(@r.Id)" class="btn btn-sm btn-outline-info">☁️ Open in Drive</button>
+                            <button type="button" onclick="revealResource(@r.Id)" class="btn btn-sm btn-outline-secondary">Folder</button>
+                        </div>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(sr.MatchedLocations))
+                    {
+                        <div class="mt-2 small text-muted-hub">
+                            Matched Timestamps: <code class="text-success">@sr.MatchedLocations</code>
+                        </div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(sr.MatchedExcerpt))
+                    {
+                        <div class="mt-1 small text-muted-hub fst-italic">@sr.MatchedExcerpt</div>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="tab-pane fade" id="tabDocs">
+            @if (!Model.DocAndSlideRefs.Any())
+            {
+                <div class="text-muted-hub small">No slides or documents matched for this topic.</div>
+            }
+            @foreach (var sr in Model.DocAndSlideRefs)
+            {
+                var r = sr.CourseResource;
+                <div class="p-3 mb-2 rounded border" style="border-color:var(--border)!important;background:var(--bg)">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                        <div>
+                            <div class="fw-bold">
+                                @(sr.IsPrimary ? "⭐ " : "")@r.FileName
+                                <span class="badge bg-secondary ms-1">@r.ResourceType</span>
+                                <span class="badge bg-dark border ms-1">@r.Instructor</span>
+                            </div>
+                            <div class="small text-muted-hub">@r.RelativePath</div>
+                            @if (!string.IsNullOrWhiteSpace(sr.MatchedLocations))
+                            {
+                                <div class="small text-info mt-1">📍 @sr.MatchedLocations</div>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(sr.MatchedExcerpt))
+                            {
+                                <div class="small text-muted-hub mt-1">@sr.MatchedExcerpt</div>
+                            }
+                        </div>
+                        <div class="d-flex gap-1">
+                            <button type="button" onclick="openPreviewModal(@r.Id)" class="btn btn-sm btn-info text-dark fw-semibold">Preview</button>
+                            <button type="button" onclick="openExternalResource(@r.Id)" class="btn btn-sm btn-outline-light">Open</button>
+                            <button type="button" onclick="revealResource(@r.Id)" class="btn btn-sm btn-outline-secondary">Folder</button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="tab-pane fade" id="tabCode">
+            @if (!Model.CodeAndSqlRefs.Any())
+            {
+                <div class="text-muted-hub small">No standalone SQL/CS demo files matched directly for this topic.</div>
+            }
+            @foreach (var sr in Model.CodeAndSqlRefs)
+            {
+                var r = sr.CourseResource;
+                <div class="p-3 mb-2 rounded border" style="border-color:var(--border)!important;background:var(--bg)">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                        <div>
+                            <div class="fw-bold">
+                                @r.FileName
+                                <span class="badge bg-secondary ms-1">@r.ResourceType</span>
+                                <span class="badge bg-dark border ms-1">@r.Instructor</span>
+                            </div>
+                            <div class="small text-muted-hub">@r.RelativePath</div>
+                            @if (!string.IsNullOrWhiteSpace(sr.MatchedExcerpt))
+                            {
+                                <div class="small text-muted-hub mt-1">@sr.MatchedExcerpt</div>
+                            }
+                        </div>
+                        <div class="d-flex gap-1">
+                            <button type="button" onclick="openPreviewModal(@r.Id)" class="btn btn-sm btn-info text-dark fw-semibold">View Code/SQL</button>
+                            <button type="button" onclick="revealResource(@r.Id)" class="btn btn-sm btn-outline-secondary">Folder</button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</section>
+
+<!-- Topic Quick Checks & Flashcards -->
+<section id="flashcards" class="hub-card p-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="h5 fw-bold mb-0">🧠 Topic Quick Checks & Flashcards (@Model.Flashcards.Count)</h3>
+        <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="collapse" data-bs-target="#addCardPanel">＋ Add Flashcard / MCQ</button>
+    </div>
+
+    <div class="collapse mb-3" id="addCardPanel">
+        <div class="p-3 rounded border border-info" style="background:var(--bg)">
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <label class="form-label small text-muted-hub mb-1">Type</label>
+                    <select id="fcType" class="form-select form-select-sm hub-select">
+                        <option value="MCQ">MCQ</option>
+                        <option value="TrueFalse">TrueFalse</option>
+                        <option value="Output">Output</option>
+                        <option value="SQL">SQL</option>
+                        <option value="Interview">Interview</option>
+                    </select>
+                </div>
+                <div class="col-md-9">
+                    <label class="form-label small text-muted-hub mb-1">Question Prompt</label>
+                    <input id="fcPrompt" type="text" class="form-control form-control-sm hub-input" placeholder="Enter question..." />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small text-muted-hub mb-1">Options (one per line — leave blank for Interview flip card)</label>
+                    <textarea id="fcOpts" rows="3" class="form-control form-control-sm hub-input" placeholder="Option A&#10;Option B&#10;Option C"></textarea>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small text-muted-hub mb-1">Exact Correct Answer</label>
+                    <input id="fcAns" type="text" class="form-control form-control-sm hub-input mb-2" placeholder="Must match one option above if MCQ" />
+                    <label class="form-label small text-muted-hub mb-1">Explanation</label>
+                    <input id="fcExpl" type="text" class="form-control form-control-sm hub-input" placeholder="Why is this correct?" />
+                </div>
+            </div>
+            <div class="mt-2 text-end">
+                <button type="button" onclick="addTopicFlashcard(@t.Id)" class="btn btn-sm btn-info text-dark fw-semibold">Save Question</button>
+            </div>
+        </div>
+    </div>
+
+    @if (!Model.Flashcards.Any())
+    {
+        <div class="small text-muted-hub">No flashcards yet for this topic — click <strong>＋ Add Flashcard / MCQ</strong> above to create one!</div>
+    }
+    else
+    {
+        <div class="row g-3">
+            @foreach (var q in Model.Flashcards)
+            {
+                <div class="col-md-6">
+                    <div class="quiz-card p-3 rounded border h-100" style="border-color:var(--border)!important;background:var(--bg)">
+                        <div class="d-flex justify-content-between small text-muted-hub mb-2">
+                            <span class="badge bg-secondary">@q.QuestionType</span>
+                            <span>@q.SourceCitation</span>
+                        </div>
+                        <div class="fw-semibold mb-2">@q.Prompt</div>
+                        @if (!string.IsNullOrWhiteSpace(q.CodeBlock))
+                        {
+                            <pre class="code-box ltr-code mb-2 small"><code>@q.CodeBlock</code></pre>
+                        }
+                        @if (q.Options.Any())
+                        {
+                            <div class="d-grid gap-2">
+                                @foreach (var opt in q.Options)
+                                {
+                                    <button type="button" class="flashcard-option small" data-option="@opt"
+                                            onclick='submitQuizChoice(@q.Id, this, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(opt)))'>
+                                        @opt
+                                    </button>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <details class="mt-2">
+                                <summary class="text-info small" style="cursor:pointer">Show Answer & Explanation</summary>
+                                <div class="mt-2 small text-success"><strong>Answer:</strong> @q.CorrectAnswer</div>
+                                @if (!string.IsNullOrWhiteSpace(q.Explanation))
+                                {
+                                    <div class="small text-muted-hub mt-1">@q.Explanation</div>
+                                }
+                            </details>
+                        }
+                        <div class="quiz-feedback d-none"></div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</section>
+
+@section Scripts {
+<script>
+async function saveTopicEdits(topicId) {
+    const resp = await fetch(`/api/topics/${topicId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            titleEn: document.getElementById("edTitleEn").value,
+            titleAr: document.getElementById("edTitleAr").value,
+            sessionLabel: document.getElementById("edSession").value,
+            priority: document.getElementById("edPriority").value,
+            codeLanguage: document.getElementById("edLang").value,
+            summaryAr: document.getElementById("edSumAr").value,
+            summaryEn: document.getElementById("edSumEn").value,
+            codeSnippet: document.getElementById("edCode").value,
+            commonMistakes: document.getElementById("edMistakes").value,
+            interviewQuestions: document.getElementById("edInterview").value
+        })
+    });
+    if (resp.ok) location.reload();
+}
+
+async function addTopicKey(topicId) {
+    const resp = await fetch(`/api/topics/${topicId}/conventions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            keyName: document.getElementById("nkName").value,
+            category: document.getElementById("nkCat").value,
+            shortRule: document.getElementById("nkRule").value,
+            exampleSnippet: document.getElementById("nkEx").value,
+            isCritical: true
+        })
+    });
+    if (resp.ok) location.reload();
+}
+
+let citLookupTimer = null;
+function lookupCourseResources(q) {
+    clearTimeout(citLookupTimer);
+    citLookupTimer = setTimeout(async () => {
+        const resp = await fetch(`/api/resources/lookup?q=${encodeURIComponent(q)}`);
+        if (!resp.ok) return;
+        const rows = await resp.json();
+        const sel = document.getElementById("citResourceSelect");
+        sel.innerHTML = rows.map(r => `<option value="${r.id}">[${r.resourceType}] ${r.fileName} (${r.relativePath})</option>`).join("");
+    }, 200);
+}
+document.addEventListener("DOMContentLoaded", () => lookupCourseResources(""));
+
+async function attachTopicCitation(topicId) {
+    const resId = parseInt(document.getElementById("citResourceSelect").value, 10);
+    if (!resId) return;
+    const loc = document.getElementById("citLocation").value.trim();
+    let ts = null;
+    const m = /^(\d+):(\d{2})$/.exec(loc);
+    if (m) ts = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+
+    const resp = await fetch(`/api/topics/${topicId}/citations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            courseResourceId: resId,
+            matchedLocations: loc,
+            firstTimestampSeconds: ts,
+            matchReason: "Manually linked citation",
+            isPrimary: true
+        })
+    });
+    if (resp.ok) location.reload();
+}
+
+async function addTopicFlashcard(topicId) {
+    const resp = await fetch(`/api/topics/${topicId}/flashcards`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            questionType: document.getElementById("fcType").value,
+            prompt: document.getElementById("fcPrompt").value,
+            rawOptions: document.getElementById("fcOpts").value,
+            correctAnswer: document.getElementById("fcAns").value,
+            explanation: document.getElementById("fcExpl").value,
+            sourceCitation: "Custom Revision Card"
+        })
+    });
+    if (resp.ok) location.reload();
+}
+</script>
+}

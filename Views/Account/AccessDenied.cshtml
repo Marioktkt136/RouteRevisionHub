@@ -1,0 +1,50 @@
+@using RouteRevisionHub.Services
+@{
+    ViewData["Title"] = "Google Drive Access Denied";
+    Layout = "_Layout";
+    string email = ViewBag.Email as string ?? "(Unknown)";
+    string reason = ViewBag.Reason as string ?? "حسابك في جوجل لا يملك صلاحية الوصول إلى مجلدات الكورس.";
+    var roots = ViewBag.RootFolders as List<DriveRootFolderConfig> ?? new List<DriveRootFolderConfig>();
+}
+
+<div class="row justify-content-center py-4">
+    <div class="col-lg-7">
+        <div class="hub-card p-4 p-lg-5 border-danger">
+            <div class="badge bg-danger mb-3">403 · Drive Group Access Denied</div>
+            <h1 class="h3 fw-bold mb-2">غير مسموح بالدخول بهذا الحساب</h1>
+            <p class="text-muted-hub mb-3">
+                الحساب المسجل حالياً: <strong class="text-warning ltr-code">@email</strong>
+            </p>
+            <div class="alert alert-danger py-2 small mb-3">
+                <strong>تفاصيل الفحص:</strong> @reason
+            </div>
+            <p class="small rtl-ar text-muted-hub mb-4">
+                البرنامج يتحقق مباشرة من صلاحية حسابك على مجلدات Google Drive الخاصة بالجروب. سجّل الخروج ثم ادخل بالإيميل الذي يملك صلاحية فتح مجلد الجروب (<code>Eng Hossam Mostafa</code>).
+            </p>
+
+            <div class="d-flex flex-wrap gap-2 mb-4">
+                <form asp-controller="Account" asp-action="ExternalLogin" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="forceSelectAccount" value="true" />
+                    <button type="submit" class="btn btn-info text-dark fw-semibold">
+                        🔄 Switch Google Account
+                    </button>
+                </form>
+                <form asp-controller="Account" asp-action="Logout" method="post">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-outline-secondary">Sign Out</button>
+                </form>
+            </div>
+
+            <div class="small text-muted-hub">
+                المجلدات المطلوب امتلاك صلاحية قراءتها على Google Drive:
+                <ul class="mt-1 mb-0">
+                    @foreach (var r in roots.Where(x => x.Required))
+                    {
+                        <li><strong>@r.Label</strong> (<code>@r.FolderId</code>)</li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,309 @@
+@model RouteRevisionHub.Controllers.ExpandViewModel
+@{
+    ViewData["Title"] = "Expand & Live Sync";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <div>
+        <h1 class="h3 fw-bold mb-0">⚡ Expand & Live Course Sync Hub</h1>
+        <small class="text-muted-hub rtl-ar">أضف توبكس ومفاتيح جديدة بنفسك، أو اعمل Scan لمجلد الكورس لاكتشاف أي ملفات أو فيديوهات اتضافت جديد تلقائياً.</small>
+    </div>
+    <div class="d-flex gap-2 small">
+        <span class="badge bg-dark border">@Model.ModuleCount Modules</span>
+        <span class="badge bg-dark border">@Model.TopicCount Topics</span>
+        <span class="badge bg-dark border">@Model.KeyCount Keys</span>
+        <span class="badge bg-dark border">@Model.ResourceCount Files</span>
+    </div>
+</div>
+
+<!-- 1. Automatic Live Folder Scanner -->
+<div class="hub-card p-4 mb-4" style="background:linear-gradient(135deg, rgba(14,165,233,0.12), rgba(16,185,129,0.08)), var(--bg-card)">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+            <h2 class="h5 fw-bold mb-1">☁️ Live Google Drive Folder Scanner</h2>
+            <div class="small text-muted-hub">Connected Drive Roots: <code>@Model.CourseRootPath</code></div>
+            <div class="small rtl-ar text-info mt-1">
+                عند رفع ملفات أو سيشنز جديدة على Google Drive داخل المجلدات المرتبطة، اضغط Scan لفحص Drive بحسابك وإضافة الملفات وربطها بالـ Topics أوتوماتيك!
+            </div>
+        </div>
+        <div class="d-flex flex-column align-items-end gap-2">
+            <div class="form-check small">
+                <input class="form-check-input" type="checkbox" id="chkAutoCreate" checked />
+                <label class="form-check-label" for="chkAutoCreate">Auto-create new Modules/Topics for unmatched folders</label>
+            </div>
+            <button id="btnRunSync" type="button" onclick="runCourseSync()" class="btn btn-info fw-semibold text-dark">
+                ☁️ Scan Google Drive & Import New Files
+            </button>
+        </div>
+    </div>
+    <div id="syncResultBox" class="mt-3 d-none"></div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- 2. Create New Track Module -->
+    <div class="col-lg-5">
+        <div class="hub-card p-4 h-100">
+            <h2 class="h5 fw-bold mb-3">📁 Add New Track Module</h2>
+            <div class="mb-2">
+                <label class="form-label small text-muted-hub mb-1">Module Code (e.g. 10, 11, API)</label>
+                <input id="modCode" type="text" class="form-control form-control-sm hub-input" placeholder="e.g. 10" />
+            </div>
+            <div class="mb-2">
+                <label class="form-label small text-muted-hub mb-1">English Title</label>
+                <input id="modTitleEn" type="text" class="form-control form-control-sm hub-input" placeholder="e.g. RESTful Web APIs & JWT" />
+            </div>
+            <div class="mb-2">
+                <label class="form-label small text-muted-hub mb-1">Arabic Title (Optional)</label>
+                <input id="modTitleAr" type="text" class="form-control form-control-sm hub-input" placeholder="تطوير الـ Web APIs والـ Security" />
+            </div>
+            <div class="mb-2">
+                <label class="form-label small text-muted-hub mb-1">Description</label>
+                <textarea id="modDesc" rows="2" class="form-control form-control-sm hub-input" placeholder="Controllers, DTOs, Swagger, Identity, JWT..."></textarea>
+            </div>
+            <div class="mb-3">
+                <label class="form-label small text-muted-hub mb-1">Accent Color</label>
+                <select id="modColor" class="form-select form-select-sm hub-select">
+                    <option value="#38bdf8">Sky Blue (#38bdf8)</option>
+                    <option value="#10b981">Emerald (#10b981)</option>
+                    <option value="#818cf8">Indigo (#818cf8)</option>
+                    <option value="#f59e0b">Amber (#f59e0b)</option>
+                    <option value="#ec4899">Pink (#ec4899)</option>
+                    <option value="#22d3ee">Cyan (#22d3ee)</option>
+                </select>
+            </div>
+            <button type="button" onclick="createModule()" class="btn btn-outline-info btn-sm w-100 fw-semibold">＋ Create Track Module</button>
+            <div id="modCreateMsg" class="small mt-2"></div>
+        </div>
+    </div>
+
+    <!-- 3. Create New Topic -->
+    <div class="col-lg-7">
+        <div class="hub-card p-4 h-100">
+            <h2 class="h5 fw-bold mb-3">📝 Add New Revision Topic</h2>
+            <div class="row g-2">
+                <div class="col-md-6">
+                    <label class="form-label small text-muted-hub mb-1">Target Module</label>
+                    <select id="topModuleId" class="form-select form-select-sm hub-select">
+                        @foreach (var m in Model.Modules)
+                        {
+                            <option value="@m.Id">@m.Code - @m.TitleEn</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-muted-hub mb-1">Session Label</label>
+                    <input id="topSession" type="text" class="form-control form-control-sm hub-input" placeholder="Web API S01" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-muted-hub mb-1">Priority</label>
+                    <select id="topPriority" class="form-select form-select-sm hub-select">
+                        <option value="InterviewCritical">InterviewCritical</option>
+                        <option value="Core" selected>Core</option>
+                        <option value="Advanced">Advanced</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small text-muted-hub mb-1">English Title</label>
+                    <input id="topTitleEn" type="text" class="form-control form-control-sm hub-input" placeholder="e.g. JWT Bearer Authentication & Refresh Tokens" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small text-muted-hub mb-1">Arabic Title</label>
+                    <input id="topTitleAr" type="text" class="form-control form-control-sm hub-input" placeholder="توثيق الـ JWT و الـ Refresh Token" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label small text-muted-hub mb-1">Arabic Quick Review Summary</label>
+                    <textarea id="topSumAr" rows="2" class="form-control form-control-sm hub-input" placeholder="ملخص سريع بالعربي لأهم النقاط..."></textarea>
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label small text-muted-hub mb-1">Technical Summary / Key Points</label>
+                    <textarea id="topSumEn" rows="2" class="form-control form-control-sm hub-input" placeholder="Key concepts, behaviors, rules..."></textarea>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small text-muted-hub mb-1">Code Language</label>
+                    <select id="topLang" class="form-select form-select-sm hub-select">
+                        <option value="csharp">C#</option>
+                        <option value="sql">SQL</option>
+                        <option value="cshtml">Razor (.cshtml)</option>
+                        <option value="http">HTTP</option>
+                    </select>
+                </div>
+                <div class="col-12">
+                    <label class="form-label small text-muted-hub mb-1">Code / SQL Pattern Snippet</label>
+                    <textarea id="topCode" rows="2" class="form-control form-control-sm hub-input ltr-code" placeholder="// Optional C# or T-SQL example"></textarea>
+                </div>
+                <div class="col-12">
+                    <label class="form-label small text-muted-hub mb-1">Initial Convention Keys (one per line: <code>KeyName | Category | Rule | Example</code>)</label>
+                    <textarea id="topKeys" rows="2" class="form-control form-control-sm hub-input ltr-code" placeholder="[Authorize] | Security | Enforces authenticated JWT/Cookie user | [Authorize(Roles = &quot;Admin&quot;)]"></textarea>
+                </div>
+            </div>
+            <button type="button" onclick="createTopic()" class="btn btn-info btn-sm text-dark fw-semibold w-100 mt-3">＋ Create Topic & Open Review Page</button>
+            <div id="topCreateMsg" class="small mt-2"></div>
+        </div>
+    </div>
+</div>
+
+<!-- 4. Unlinked / Newly Imported Resources Quick Attacher -->
+<div class="hub-card p-4">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h2 class="h5 fw-bold mb-0">📎 Course Files Not Yet Cited to Any Topic (@Model.UnlinkedCount)</h2>
+        <span class="small text-muted-hub">Quickly attach any file or newly added video to a Topic</span>
+    </div>
+    @if (!Model.UnlinkedResources.Any())
+    {
+        <div class="small text-success">All indexed resources have topic citations!</div>
+    }
+    else
+    {
+        <div class="table-responsive" style="max-height:380px;overflow-y:auto">
+            <table class="table table-sm align-middle mb-0" style="color:var(--text)">
+                <thead>
+                    <tr class="small text-muted-hub" style="border-color:var(--border)">
+                        <th>Resource</th>
+                        <th>Folder / Type</th>
+                        <th>Link to Topic</th>
+                        <th>Location / Timestamp</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in Model.UnlinkedResources)
+                    {
+                        <tr style="border-color:var(--border)">
+                            <td class="small">
+                                <div class="fw-semibold">@r.FileName</div>
+                                <div class="text-muted-hub" style="font-size:0.75rem">@r.RelativePath</div>
+                            </td>
+                            <td class="small">
+                                <span class="badge bg-secondary">@r.ResourceType</span>
+                                <div class="text-muted-hub">@r.ModuleFolder</div>
+                            </td>
+                            <td>
+                                <select id="linkTopic_@r.Id" class="form-select form-select-sm hub-select" style="min-width:220px">
+                                    @foreach (var t in Model.AllTopics)
+                                    {
+                                        <option value="@t.Id">[@t.TrackModule.Code] @t.TitleEn</option>
+                                    }
+                                </select>
+                            </td>
+                            <td>
+                                <input id="linkLoc_@r.Id" type="text" class="form-control form-control-sm hub-input" placeholder="e.g. 04:15 or S05" style="max-width:140px" />
+                            </td>
+                            <td>
+                                <button type="button" onclick="quickAttachResource(@r.Id)" class="btn btn-sm btn-outline-success">Attach</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@section Scripts {
+<script>
+async function runCourseSync() {
+    const btn = document.getElementById("btnRunSync");
+    const box = document.getElementById("syncResultBox");
+    const autoCreate = document.getElementById("chkAutoCreate").checked;
+    btn.disabled = true;
+    btn.textContent = "☁️ Scanning Google Drive Folders...";
+    try {
+        const resp = await fetch("/api/sync/scan", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ autoCreateTopics: autoCreate })
+        });
+        box.classList.remove("d-none");
+        if (!resp.ok) {
+            const errTxt = await resp.text();
+            box.innerHTML = `<div class="alert alert-danger small mb-0">Google Drive scan failed (${resp.status}): ${errTxt}</div>`;
+            return;
+        }
+        const data = await resp.json();
+        box.innerHTML = `<div class="p-3 rounded border border-info" style="background:var(--bg)">
+            <div class="fw-bold text-info mb-1">✓ Google Drive Scan Completed!</div>
+            <div class="small">Files on Google Drive: <strong>${data.scannedFilesOnDisk}</strong> · New Files Imported: <strong>${data.newResourcesAdded}</strong> · New Modules: <strong>${data.newModulesCreated}</strong> · New Topics: <strong>${data.newTopicsCreated}</strong> · New Links: <strong>${data.newTopicLinksCreated}</strong></div>
+            ${data.createdTopicTitles?.length ? `<div class="small text-success mt-1">Auto-created topics: ${data.createdTopicTitles.join(", ")}</div>` : ""}
+            ${data.newFilePaths?.length ? `<div class="small text-muted-hub mt-1">Imported Drive paths: <code>${data.newFilePaths.slice(0,8).join(" | ")}</code></div>` : `<div class="small text-muted-hub mt-1">No new unindexed files found on Google Drive — everything is up to date!</div>`}
+        </div>`;
+        if (data.newResourcesAdded > 0 || data.newTopicsCreated > 0) {
+            setTimeout(() => location.reload(), 1800);
+        }
+    } catch (err) {
+        box.classList.remove("d-none");
+        box.innerHTML = `<div class="alert alert-danger small mb-0">Error during Google Drive scan: ${err?.message || err}</div>`;
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "☁️ Scan Google Drive & Import New Files";
+    }
+}
+
+async function createModule() {
+    const msg = document.getElementById("modCreateMsg");
+    const resp = await fetch("/api/modules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            code: document.getElementById("modCode").value,
+            titleEn: document.getElementById("modTitleEn").value,
+            titleAr: document.getElementById("modTitleAr").value,
+            description: document.getElementById("modDesc").value,
+            badgeColor: document.getElementById("modColor").value
+        })
+    });
+    if (resp.ok) {
+        msg.innerHTML = `<span class="text-success">✓ Module created! Reloading...</span>`;
+        setTimeout(() => location.reload(), 700);
+    } else {
+        msg.innerHTML = `<span class="text-danger">${await resp.text()}</span>`;
+    }
+}
+
+async function createTopic() {
+    const msg = document.getElementById("topCreateMsg");
+    const resp = await fetch("/api/topics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            trackModuleId: parseInt(document.getElementById("topModuleId").value, 10),
+            titleEn: document.getElementById("topTitleEn").value,
+            titleAr: document.getElementById("topTitleAr").value,
+            sessionLabel: document.getElementById("topSession").value,
+            priority: document.getElementById("topPriority").value,
+            codeLanguage: document.getElementById("topLang").value,
+            summaryAr: document.getElementById("topSumAr").value,
+            summaryEn: document.getElementById("topSumEn").value,
+            codeSnippet: document.getElementById("topCode").value,
+            rawConventionKeys: document.getElementById("topKeys").value
+        })
+    });
+    if (resp.ok) {
+        const t = await resp.json();
+        window.location.href = `/Topics/Details/${t.slug}`;
+    } else {
+        msg.innerHTML = `<span class="text-danger">${await resp.text()}</span>`;
+    }
+}
+
+async function quickAttachResource(resourceId) {
+    const topicId = parseInt(document.getElementById("linkTopic_" + resourceId).value, 10);
+    const loc = document.getElementById("linkLoc_" + resourceId).value.trim();
+    let ts = null;
+    const m = /^(\d+):(\d{2})$/.exec(loc);
+    if (m) ts = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+
+    const resp = await fetch(`/api/topics/${topicId}/citations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            courseResourceId: resourceId,
+            matchedLocations: loc,
+            firstTimestampSeconds: ts,
+            matchReason: "Attached from Expand Hub",
+            isPrimary: true
+        })
+    });
+    if (resp.ok) location.reload();
+}
+</script>
+}

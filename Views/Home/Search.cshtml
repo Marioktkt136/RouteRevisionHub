@@ -1,0 +1,160 @@
+@model RouteRevisionHub.Services.SearchResponseDto
+@{
+    ViewData["Title"] = "Smart Search";
+    var modules = (List<RouteRevisionHub.Models.Entities.TrackModule>)ViewBag.Modules;
+    var instructors = (List<string>)ViewBag.Instructors;
+    var resourceTypes = (List<string>)ViewBag.ResourceTypes;
+    int? selectedModuleId = ViewBag.SelectedModuleId;
+    string? selectedType = ViewBag.SelectedType;
+    string? selectedInstructor = ViewBag.SelectedInstructor;
+}
+
+<h1 class="h3 fw-bold mb-3">Smart Material & Video OCR Search</h1>
+
+<form method="get" asp-action="Search" class="hub-card p-3 mb-4">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label small text-muted-hub mb-1">Search Keyword / Convention / Code / Error</label>
+            <input type="text" name="q" value="@Model.Query" class="form-control form-control-sm hub-input" placeholder="e.g. AsNoTracking, CLUSTERED, ExecuteUpdate, TPH, _ViewStart..." />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small text-muted-hub mb-1">Track Module (Topics/Keys)</label>
+            <select name="moduleId" class="form-select form-select-sm hub-select">
+                <option value="">All Modules</option>
+                @foreach (var m in modules)
+                {
+                    <option value="@m.Id" selected="@(selectedModuleId == m.Id)">@m.Code - @m.TitleEn</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted-hub mb-1">Resource Type</label>
+            <select name="resourceType" class="form-select form-select-sm hub-select">
+                <option value="">All Types</option>
+                @foreach (var rt in resourceTypes)
+                {
+                    <option value="@rt" selected="@(selectedType == rt)">@rt</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted-hub mb-1">Instructor</label>
+            <select name="instructor" class="form-select form-select-sm hub-select">
+                <option value="">All</option>
+                @foreach (var ins in instructors)
+                {
+                    <option value="@ins" selected="@(selectedInstructor == ins)">@ins</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-1">
+            <button type="submit" class="btn btn-info btn-sm text-dark fw-semibold w-100">Go</button>
+        </div>
+    </div>
+</form>
+
+@if (string.IsNullOrWhiteSpace(Model.Query))
+{
+    <div class="hub-card p-4 text-center text-muted-hub">
+        Type any keyword above — search scans <strong>Topics</strong>, <strong>Convention Keys</strong>, <strong>546 Videos (Keyframe OCR)</strong>, and <strong>842 Slides / PDFs / DOCX Guides / SQL / C# Files</strong>.
+    </div>
+}
+else
+{
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <h2 class="h5 fw-bold mb-2 text-info">Matching Topics (@Model.Topics.Count)</h2>
+            @if (!Model.Topics.Any())
+            {
+                <div class="hub-card p-3 small text-muted-hub mb-4">No topics matched "@Model.Query".</div>
+            }
+            @foreach (var t in Model.Topics)
+            {
+                <a asp-controller="Topics" asp-action="Details" asp-route-id="@t.Slug" class="text-decoration-none d-block mb-2" style="color:inherit">
+                    <div class="hub-card hub-card-hover p-3">
+                        <div class="d-flex justify-content-between">
+                            <span class="badge" style="background:@(t.BadgeColor)22;color:@t.BadgeColor">@t.ModuleCode · @t.SessionLabel</span>
+                            <span class="badge badge-status-@t.Status">@t.Status</span>
+                        </div>
+                        <div class="fw-bold mt-1">@t.TitleEn</div>
+                        <div class="small text-muted-hub rtl-ar">@t.TitleAr</div>
+                    </div>
+                </a>
+            }
+
+            <h2 class="h5 fw-bold mt-4 mb-2 text-warning">Matching Convention Keys (@Model.ConventionKeys.Count)</h2>
+            @if (!Model.ConventionKeys.Any())
+            {
+                <div class="hub-card p-3 small text-muted-hub">No convention keys matched "@Model.Query".</div>
+            }
+            @foreach (var k in Model.ConventionKeys)
+            {
+                <div class="hub-card p-3 mb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="key-pill @(k.IsCritical ? "critical" : "")">@k.KeyName</span>
+                        <a asp-controller="Topics" asp-action="Details" asp-route-id="@k.TopicSlug" class="small text-info text-decoration-none">
+                            [@k.ModuleCode] @k.TopicTitleEn →
+                        </a>
+                    </div>
+                    <div class="small">@k.ShortRule</div>
+                </div>
+            }
+        </div>
+
+        <div class="col-lg-6">
+            <h2 class="h5 fw-bold mb-2 text-success">Matched Videos & Exact Timestamps (@Model.Videos.Count)</h2>
+            @if (!Model.Videos.Any())
+            {
+                <div class="hub-card p-3 small text-muted-hub mb-4">No videos matched "@Model.Query".</div>
+            }
+            @foreach (var v in Model.Videos)
+            {
+                <div class="hub-card p-3 mb-2">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <div>
+                            <strong>🎬 @v.FileName</strong>
+                            @if (v.MatchedTimestampSeconds.HasValue)
+                            {
+                                <button type="button" onclick="openVideoModal(@v.Id, @v.MatchedTimestampSeconds.Value)" class="ts-chip ms-2">
+                                    ▶ Play @v.MatchedTimestampLabel
+                                </button>
+                            }
+                            else
+                            {
+                                <button type="button" onclick="openVideoModal(@v.Id, 0)" class="ts-chip ms-2">▶ Play</button>
+                            }
+                            <div class="small text-muted-hub">@v.RelativePath · @v.Instructor · @v.DurationFormatted</div>
+                        </div>
+                    </div>
+                    @if (!string.IsNullOrEmpty(v.Excerpt))
+                    {
+                        <div class="small text-muted-hub mt-2 p-2 rounded" style="background:var(--bg)">@v.Excerpt</div>
+                    }
+                </div>
+            }
+
+            <h2 class="h5 fw-bold mt-4 mb-2" style="color:var(--accent-2)">Matched Files / Slides / SQL / C# (@Model.Files.Count)</h2>
+            @if (!Model.Files.Any())
+            {
+                <div class="hub-card p-3 small text-muted-hub">No documents or code files matched "@Model.Query".</div>
+            }
+            @foreach (var f in Model.Files)
+            {
+                <div class="hub-card p-3 mb-2">
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                        <div>
+                            <strong>📄 @f.FileName</strong>
+                            <span class="badge bg-secondary ms-1">@f.ResourceType</span>
+                            <div class="small text-muted-hub">@f.RelativePath · @f.Instructor</div>
+                        </div>
+                        <button type="button" onclick="openPreviewModal(@f.Id)" class="btn btn-sm btn-outline-info">Preview</button>
+                    </div>
+                    @if (!string.IsNullOrEmpty(f.Excerpt))
+                    {
+                        <div class="small text-muted-hub mt-2 p-2 rounded" style="background:var(--bg)">@f.Excerpt</div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}

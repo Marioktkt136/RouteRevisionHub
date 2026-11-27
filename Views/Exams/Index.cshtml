@@ -1,0 +1,302 @@
+@model RouteRevisionHub.Controllers.ExamsIndexViewModel
+@{
+    ViewData["Title"] = "Chapter Exams & Deadlines";
+}
+
+<div class="hub-card p-4 mb-4" style="background:linear-gradient(135deg, rgba(245,158,11,0.14), rgba(99,102,241,0.12)), var(--bg-card)">
+    <div class="row g-3 align-items-center">
+        <div class="col-lg-7">
+            <span class="badge bg-warning text-dark mb-2">End-of-Chapter Assessment & Deadlines · امتحانات الشباتر بالديدلاين</span>
+            <h1 class="h3 fw-bold mb-1">🏆 Chapter Exams & Study Deadlines</h1>
+            <p class="small text-muted-hub rtl-ar mb-0">
+                بعد ما تخلص أي Chapter، حدد لنفسك <strong>Deadline</strong> وابدأ امتحان محكوم بوقت فعلي (Timer) من أسئلة الكورس وأي أسئلة إضافية تضيفها — مع حفظ النتائج ومراجعة الأخطاء في SQL Server.
+            </p>
+        </div>
+        <div class="col-lg-5">
+            <div class="p-3 rounded border" style="border-color:var(--border)!important;background:var(--bg)">
+                <div class="small fw-bold mb-2">📅 Auto-Schedule Chapter Deadlines</div>
+                <div class="row g-2 align-items-center">
+                    <div class="col-5">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text hub-input">Every</span>
+                            <input id="autoDaysInput" type="number" min="1" max="30" value="3" class="form-control hub-input" />
+                            <span class="input-group-text hub-input">days</span>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <input id="autoStartInput" type="date" value="@DateTime.Today.ToString("yyyy-MM-dd")" class="form-control form-control-sm hub-input" />
+                    </div>
+                    <div class="col-3">
+                        <button type="button" onclick="autoScheduleDeadlines()" class="btn btn-sm btn-warning text-dark fw-semibold w-100">Schedule</button>
+                    </div>
+                </div>
+                <div id="autoSchedMsg" class="small text-success mt-1 d-none"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toolbar Buttons -->
+<div class="d-flex flex-wrap gap-2 mb-4">
+    <button type="button" class="btn btn-info btn-sm text-dark fw-semibold" data-bs-toggle="collapse" data-bs-target="#createExamPanel">＋ Create Custom Chapter Exam</button>
+    <button type="button" class="btn btn-outline-warning btn-sm" data-bs-toggle="collapse" data-bs-target="#addExamQuestionPanel">＋ Add New Question to Any Exam</button>
+</div>
+
+<!-- Create Custom Exam Panel -->
+<div class="collapse mb-4" id="createExamPanel">
+    <div class="hub-card p-4 border-info">
+        <h2 class="h6 fw-bold text-info mb-3">＋ Create New Timed Exam with Deadline</h2>
+        <div class="row g-2">
+            <div class="col-md-4">
+                <label class="form-label small text-muted-hub mb-1">Target Chapter (or All Mixed)</label>
+                <select id="exModId" class="form-select form-select-sm hub-select">
+                    <option value="">All Chapters (Comprehensive Mock)</option>
+                    @foreach (var m in Model.Modules)
+                    {
+                        <option value="@m.Id">@m.Code - @m.TitleEn</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small text-muted-hub mb-1">Exam Title (EN)</label>
+                <input id="exTitle" type="text" class="form-control form-control-sm hub-input" placeholder="e.g. EF Core Mastery Exam #1" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small text-muted-hub mb-1">Title (AR - Optional)</label>
+                <input id="exTitleAr" type="text" class="form-control form-control-sm hub-input" placeholder="امتحان التمكن من EF Core" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small text-muted-hub mb-1">Time Limit (Minutes)</label>
+                <input id="exTime" type="number" min="1" max="180" value="15" class="form-control form-control-sm hub-input" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small text-muted-hub mb-1">Pass Score (%)</label>
+                <input id="exPass" type="number" min="10" max="100" value="70" class="form-control form-control-sm hub-input" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small text-muted-hub mb-1">Target Deadline Date</label>
+                <input id="exDeadline" type="date" class="form-control form-control-sm hub-input" />
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="button" onclick="createExam()" class="btn btn-sm btn-info text-dark fw-semibold w-100">Create Exam</button>
+            </div>
+            <div class="col-12">
+                <input id="exDesc" type="text" class="form-control form-control-sm hub-input" placeholder="Optional scope description..." />
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Custom Question to Exam Panel -->
+<div class="collapse mb-4" id="addExamQuestionPanel">
+    <div class="hub-card p-4 border-warning">
+        <h2 class="h6 fw-bold text-warning mb-3">＋ Add Custom Question to an Exam (also searchable in Topic Flashcards!)</h2>
+        <div class="row g-2">
+            <div class="col-md-4">
+                <label class="form-label small text-muted-hub mb-1">Target Exam</label>
+                <select id="aqExamId" class="form-select form-select-sm hub-select">
+                    @foreach (var c in Model.Exams)
+                    {
+                        <option value="@c.Exam.Id">@c.Exam.Title</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-5">
+                <label class="form-label small text-muted-hub mb-1">Related Topic</label>
+                <select id="aqTopicId" class="form-select form-select-sm hub-select">
+                    @foreach (var tp in Model.Topics)
+                    {
+                        <option value="@tp.Id">[@tp.TrackModule.Code] @tp.TitleEn</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small text-muted-hub mb-1">Question Type</label>
+                <select id="aqType" class="form-select form-select-sm hub-select">
+                    <option value="MCQ">MCQ</option>
+                    <option value="TrueFalse">TrueFalse</option>
+                    <option value="Output">Output</option>
+                    <option value="SQL">SQL</option>
+                    <option value="Interview">Interview (Self-check)</option>
+                </select>
+            </div>
+            <div class="col-12">
+                <label class="form-label small text-muted-hub mb-1">Question Prompt</label>
+                <input id="aqPrompt" type="text" class="form-control form-control-sm hub-input" placeholder="Write the exam question..." />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small text-muted-hub mb-1">Options (one per line, blank for open-ended Interview)</label>
+                <textarea id="aqOptions" rows="3" class="form-control form-control-sm hub-input" placeholder="Option A&#10;Option B&#10;Option C&#10;Option D"></textarea>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small text-muted-hub mb-1">Exact Correct Answer</label>
+                <input id="aqAnswer" type="text" class="form-control form-control-sm hub-input mb-2" placeholder="Exact matching option or model answer" />
+                <label class="form-label small text-muted-hub mb-1">Explanation / Source</label>
+                <input id="aqExpl" type="text" class="form-control form-control-sm hub-input" placeholder="Why this is correct..." />
+            </div>
+        </div>
+        <div class="mt-2 text-end">
+            <button type="button" onclick="addQuestionToExam()" class="btn btn-sm btn-warning text-dark fw-semibold">Save Question to Exam</button>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Left 8 cols: Chapter Exam Cards -->
+    <div class="col-lg-8">
+        <div class="row g-3">
+            @foreach (var card in Model.Exams)
+            {
+                var ex = card.Exam;
+                <div class="col-md-6" id="examCard_@ex.Id">
+                    <div class="hub-card hub-card-hover p-3 h-100 d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                <span class="badge @(ex.TrackModule != null ? "" : "bg-primary")"
+                                      style="@(ex.TrackModule != null ? $"background:{ex.TrackModule.BadgeColor}22;color:{ex.TrackModule.BadgeColor};border:1px solid {ex.TrackModule.BadgeColor}55" : "")">
+                                    @(ex.TrackModule != null ? $"Chapter {ex.TrackModule.Code}" : "Full Track Mock")
+                                </span>
+                                <span id="dlBadge_@ex.Id" class="badge @card.DeadlineBadgeClass">@card.DeadlineBadge</span>
+                            </div>
+
+                            <h3 class="h6 fw-bold mb-1">@ex.Title</h3>
+                            <div class="small text-info rtl-ar mb-1">@ex.TitleAr</div>
+                            <p class="small text-muted-hub mb-2">@ex.Description</p>
+
+                            <div class="d-flex flex-wrap gap-2 small text-muted-hub mb-3">
+                                <span>❓ @card.AvailableQuestionsCount Qs</span>
+                                <span>⏱ @ex.TimeLimitMinutes min</span>
+                                <span>🎯 Pass: @ex.PassingScorePercent%</span>
+                                @if (ex.BestScorePercent > 0)
+                                {
+                                    <span class="text-success fw-semibold">Best: @ex.BestScorePercent%</span>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="pt-2 border-top" style="border-color:var(--border)!important">
+                            <!-- Inline Deadline Editor -->
+                            <div class="input-group input-group-sm mb-2">
+                                <span class="input-group-text hub-input">Deadline</span>
+                                <input id="dlDate_@ex.Id" type="date" value="@(ex.DeadlineAt?.ToString("yyyy-MM-dd") ?? "")" class="form-control hub-input" />
+                                <input id="dlMin_@ex.Id" type="number" min="1" max="180" value="@ex.TimeLimitMinutes" class="form-control hub-input" style="max-width:65px" title="Minutes" />
+                                <button type="button" onclick="saveExamSchedule(@ex.Id, @ex.PassingScorePercent)" class="btn btn-outline-info">Save</button>
+                            </div>
+                            <div class="d-flex gap-2">
+                                @if (card.AvailableQuestionsCount > 0)
+                                {
+                                    <a asp-action="Take" asp-route-id="@ex.Id" class="btn btn-sm btn-warning text-dark fw-semibold flex-grow-1">▶ Start Timed Exam</a>
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary flex-grow-1" disabled>Add Qs first</button>
+                                }
+                                <button type="button" onclick="deleteExam(@ex.Id)" class="btn btn-sm btn-outline-danger" title="Delete Exam">×</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Right 4 cols: Recent Exam Results & History -->
+    <div class="col-lg-4">
+        <div class="hub-card p-3 sticky-top" style="top:74px;z-index:10">
+            <h2 class="h5 fw-bold mb-2">📊 Recent Exam Attempts</h2>
+            @if (!Model.RecentSubmissions.Any())
+            {
+                <div class="small text-muted-hub">No completed exams yet. Pick any Chapter Exam and test yourself before its deadline!</div>
+            }
+            else
+            {
+                <div class="d-flex flex-column gap-2" style="max-height:65vh;overflow-y:auto">
+                    @foreach (var sub in Model.RecentSubmissions)
+                    {
+                        <a asp-action="Result" asp-route-id="@sub.Id" class="text-decoration-none d-block p-2 rounded border"
+                           style="border-color:@(sub.Passed ? "var(--success)" : "var(--danger)")!important;background:var(--bg);color:var(--text)">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong class="small">@sub.ChapterExam.Title</strong>
+                                <span class="badge @(sub.Passed ? "bg-success" : "bg-danger")">@sub.ScorePercent%</span>
+                            </div>
+                            <div class="small text-muted-hub mt-1">
+                                @sub.CorrectAnswers/@sub.TotalQuestions correct · @TimeSpan.FromSeconds(sub.DurationSecondsUsed).ToString(@"mm\:ss") · @sub.SubmittedAt.ToLocalTime().ToString("MM-dd HH:mm")
+                            </div>
+                        </a>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+async function autoScheduleDeadlines() {
+    const days = parseInt(document.getElementById("autoDaysInput").value || "3", 10);
+    const start = document.getElementById("autoStartInput").value || null;
+    const resp = await fetch("/api/exams/auto-schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ daysPerChapter: days, startDate: start })
+    });
+    if (resp.ok) location.reload();
+}
+
+async function saveExamSchedule(examId, passPct) {
+    const dtVal = document.getElementById("dlDate_" + examId).value;
+    const mins = parseInt(document.getElementById("dlMin_" + examId).value || "15", 10);
+    const resp = await fetch(`/api/exams/${examId}/schedule`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            deadlineAt: dtVal ? dtVal : null,
+            timeLimitMinutes: mins,
+            passingScorePercent: passPct
+        })
+    });
+    if (resp.ok) location.reload();
+}
+
+async function createExam() {
+    const modVal = document.getElementById("exModId").value;
+    const dlVal = document.getElementById("exDeadline").value;
+    const resp = await fetch("/api/exams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            trackModuleId: modVal ? parseInt(modVal, 10) : null,
+            title: document.getElementById("exTitle").value,
+            titleAr: document.getElementById("exTitleAr").value,
+            description: document.getElementById("exDesc").value,
+            timeLimitMinutes: parseInt(document.getElementById("exTime").value || "15", 10),
+            passingScorePercent: parseInt(document.getElementById("exPass").value || "70", 10),
+            deadlineAt: dlVal ? dlVal : null
+        })
+    });
+    if (resp.ok) location.reload();
+}
+
+async function addQuestionToExam() {
+    const examId = parseInt(document.getElementById("aqExamId").value, 10);
+    const resp = await fetch(`/api/exams/${examId}/questions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            topicId: parseInt(document.getElementById("aqTopicId").value, 10),
+            questionType: document.getElementById("aqType").value,
+            prompt: document.getElementById("aqPrompt").value,
+            rawOptions: document.getElementById("aqOptions").value,
+            correctAnswer: document.getElementById("aqAnswer").value,
+            explanation: document.getElementById("aqExpl").value
+        })
+    });
+    if (resp.ok) location.reload();
+}
+
+async function deleteExam(examId) {
+    const resp = await fetch(`/api/exams/${examId}`, { method: "DELETE" });
+    if (resp.ok) document.getElementById("examCard_" + examId)?.remove();
+}
+</script>
+}

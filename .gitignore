@@ -1,0 +1,13 @@
+bin/
+obj/
+.vs/
+publish/
+appsettings.Development.json
+appsettings.Local.json
+logs/
+.vercel/
+.env
+.env.*
+
+.vercel
+.env*

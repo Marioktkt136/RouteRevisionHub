@@ -1,0 +1,197 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - RouteRevisionHub</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <header class="hub-navbar">
+        <nav class="navbar navbar-expand-lg py-2">
+            <div class="container-fluid px-3 px-lg-4">
+                <a class="navbar-brand fw-bold d-flex align-items-center gap-2" asp-controller="Home" asp-action="Index" style="color:var(--text)">
+                    <span class="px-2 py-1 rounded" style="background:linear-gradient(135deg,#0284c7,#6366f1);color:#fff;font-size:0.85rem">.NET 10</span>
+                    <span>Route Revision Hub</span>
+                </a>
+                <button class="navbar-toggler border-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+                    <span class="navbar-toggler-icon" style="filter:invert(0.7)"></span>
+                </button>
+                <div class="collapse navbar-collapse gap-3" id="mainNav">
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                        <li class="nav-item">
+                            <a class="nav-link hub-nav-link" asp-controller="Home" asp-action="Index">Dashboard</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link hub-nav-link" asp-controller="Home" asp-action="Roadmap">Roadmap · خريطة التوبكس</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link hub-nav-link text-info fw-semibold" asp-controller="Architecture" asp-action="Index">🧭 Mind-Map & Flows</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link hub-nav-link text-success fw-semibold" asp-controller="Checklist" asp-action="Index">✓ Checklist</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link hub-nav-link" asp-controller="Topics" asp-action="Conventions">Convention Keys</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link hub-nav-link" asp-controller="Topics" asp-action="Quiz">Quiz Arena</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link hub-nav-link text-warning fw-semibold" asp-controller="Exams" asp-action="Index">🏆 Chapter Exams</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link hub-nav-link" asp-controller="Resources" asp-action="Index">Course Library</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link hub-nav-link text-info fw-semibold" asp-controller="Expand" asp-action="Index">＋ Expand / Sync</a>
+                        </li>
+                    </ul>
+
+                    <form class="position-relative flex-grow-1" style="max-width:460px" asp-controller="Home" asp-action="Search" method="get">
+                        <div class="input-group input-group-sm">
+                            <input id="globalSearchInput" name="q" type="search" value="@ViewContext.HttpContext.Request.Query["q"]"
+                                   class="form-control hub-input" placeholder="Search topic, key (AsNoTracking, CTE, TPH...), or video OCR... (Ctrl+K)" autocomplete="off" />
+                            <button class="btn btn-info btn-sm text-dark fw-semibold" type="submit">Search</button>
+                        </div>
+                        <div id="liveSearchDropdown" class="live-search-dropdown"></div>
+                    </form>
+
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" onclick="toggleHubTheme()" class="btn btn-sm btn-outline-secondary" title="Toggle Dark/Light Theme">
+                            ◐ Theme
+                        </button>
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <span class="badge bg-dark border text-info d-none d-xl-inline-block" title="@User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value">
+                                ☁️ @(User.Identity.Name ?? User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value)
+                            </span>
+                            <form asp-controller="Account" asp-action="Logout" method="post" class="m-0">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Sign out">Sign Out</button>
+                            </form>
+                        }
+                    </div>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <div class="container-fluid px-3 px-lg-4 py-4">
+        <main role="main">
+            @RenderBody()
+        </main>
+    </div>
+
+    <!-- Embedded Range-Streaming Video Player Modal -->
+    <div class="modal fade" id="videoPlayerModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content hub-modal">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title mb-0" id="videoModalTitle">Course Video</h5>
+                        <small class="text-muted-hub" id="videoModalMeta"></small>
+                    </div>
+                    <button type="button" class="btn-close btn-close-hub" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-lg-8">
+                            <div class="d-flex flex-wrap gap-2 mb-2">
+                                <button id="btnModeStreamPlayer" type="button" onclick="switchVideoPlayerMode('stream')" class="btn btn-sm btn-success">🎬 Stream Player (Seek @@ OCR)</button>
+                                <button id="btnModeDriveEmbed" type="button" onclick="switchVideoPlayerMode('drive')" class="btn btn-sm btn-outline-info">☁️ Google Drive Player</button>
+                            </div>
+                            <video id="hubVideoPlayer" class="w-100 rounded bg-black" style="max-height:60vh" controls playsinline></video>
+                            <iframe id="hubDriveVideoFrame" class="w-100 rounded border d-none bg-black" style="height:60vh;border-color:var(--border)!important" allow="autoplay; fullscreen"></iframe>
+                            <div id="videoCodecFallback" class="alert alert-warning d-none mt-2 py-2 small">
+                                Browser native player could not decode this video container (common for <code>.mkv</code>). Switch to <strong>☁️ Google Drive Player</strong> above or click <strong>Download Copy</strong>.
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                <button id="videoOpenExtBtn" type="button" class="btn btn-sm btn-outline-info">☁️ Open in Google Drive ↗</button>
+                                <a id="videoDownloadBtn" href="#" class="btn btn-sm btn-outline-warning">⬇ Download Copy</a>
+                                <button id="videoRevealBtn" type="button" class="btn btn-sm btn-outline-secondary">📂 Folder Contents</button>
+                            </div>
+                        </div>
+                        <div class="col-lg-4">
+                            <h6 class="fw-bold mb-2">Captured Frame OCR & Jump Points</h6>
+                            <div id="videoOcrTimeline" style="max-height:62vh;overflow-y:auto"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- File / Slide / Code / SQL Preview Modal -->
+    <div class="modal fade" id="filePreviewModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content hub-modal">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title mb-0" id="previewModalTitle">File Preview</h5>
+                        <small class="text-muted-hub" id="previewModalMeta"></small>
+                    </div>
+                    <button type="button" class="btn-close btn-close-hub" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="previewModalBody" style="max-height:72vh;overflow-y:auto"></div>
+                <div class="modal-footer justify-content-between">
+                    <div class="d-flex flex-wrap gap-2">
+                        <button id="previewOpenExtBtn" type="button" class="btn btn-sm btn-info text-dark fw-semibold">Open File</button>
+                        <a id="previewDownloadLink" href="#" class="btn btn-sm btn-outline-warning">⬇ Download / Open Copy</a>
+                        <button id="previewRevealBtn" type="button" class="btn btn-sm btn-outline-secondary">Folder Contents</button>
+                        <a id="previewRawLink" href="#" target="_blank" class="btn btn-sm btn-outline-success d-none">Open Raw in Tab</a>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- In-Browser Folder Explorer Modal (Works cleanly even when server runs in isolated agent desktop) -->
+    <div class="modal fade" id="folderBrowserModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content hub-modal">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title mb-0">📂 Session Folder Browser</h5>
+                        <small class="text-muted-hub" id="folderModalMeta"></small>
+                    </div>
+                    <button type="button" class="btn-close btn-close-hub" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="folderModalBody" style="max-height:74vh;overflow-y:auto"></div>
+                <div class="modal-footer justify-content-between">
+                    <div class="small text-muted-hub">Google Drive Online Edition · Access enforced per signed-in Google account.</div>
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- External File Fallback Modal (for .pptx/.docx/.rar/.mkv when running in isolated agent desktop) -->
+    <div class="modal fade" id="externalFileModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content hub-modal">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title mb-0" id="extModalTitle">Open File</h5>
+                        <small class="text-muted-hub" id="extModalDesktopInfo"></small>
+                    </div>
+                    <button type="button" class="btn-close btn-close-hub" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="extModalBody"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="hubToastContainer" class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:2000"></div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

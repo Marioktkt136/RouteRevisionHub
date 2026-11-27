@@ -1,0 +1,506 @@
+@using System.Text.Json
+@model RouteRevisionHub.Controllers.ArchitectureViewModel
+@{
+    ViewData["Title"] = "Mind-Map & Process Flows";
+    string activeTab = ViewBag.ActiveTab ?? "mindmap";
+    string? selectedFlow = ViewBag.SelectedFlow;
+    var firstFlowId = Model.ProcessFlows.FirstOrDefault()?.Id ?? "";
+    string activeFlowId = !string.IsNullOrWhiteSpace(selectedFlow) ? selectedFlow : firstFlowId;
+}
+
+<style>
+    .mm-viewport {
+        position: relative;
+        overflow: auto;
+        border: 1px solid var(--border);
+        border-radius: 0.9rem;
+        background: radial-gradient(circle at 20% 20%, rgba(56,189,248,0.06), transparent 45%), var(--bg);
+        padding: 1.5rem;
+        max-height: 76vh;
+    }
+    .mm-canvas {
+        position: relative;
+        display: flex;
+        gap: 2.4rem;
+        align-items: flex-start;
+        min-width: max-content;
+        transform-origin: top left;
+    }
+    .mm-svg-layer {
+        position: absolute;
+        top: 0;
+        left: 0;
+        pointer-events: none;
+        z-index: 1;
+    }
+    .mm-col {
+        position: relative;
+        z-index: 2;
+        width: 245px;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    .mm-col-hdr {
+        padding: 0.65rem 0.8rem;
+        border-radius: 0.7rem;
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        z-index: 5;
+    }
+    .mm-node {
+        position: relative;
+        background: var(--bg-card);
+        border: 1.5px solid var(--border);
+        border-radius: 0.7rem;
+        padding: 0.65rem 0.75rem;
+        cursor: pointer;
+        transition: transform 0.15s ease, border-color 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+    }
+    .mm-node:hover {
+        transform: translateY(-2px);
+        border-color: var(--accent);
+    }
+    .mm-node.selected {
+        border-color: #38bdf8 !important;
+        box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+    }
+    .mm-node.upstream {
+        border-color: #fbbf24 !important;
+        box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.22);
+    }
+    .mm-node.downstream {
+        border-color: #34d399 !important;
+        box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.22);
+    }
+    .mm-node.dimmed {
+        opacity: 0.26;
+    }
+    .flow-step-card {
+        position: relative;
+        border: 1px solid var(--border);
+        border-radius: 0.85rem;
+        background: var(--bg);
+        padding: 1rem 1.2rem;
+    }
+    .flow-arrow-connector {
+        display: flex;
+        justify-content: center;
+        padding: 0.25rem 0;
+        color: var(--accent);
+        font-weight: bold;
+        font-size: 1.2rem;
+    }
+</style>
+
+<!-- Header & Mode Tabs -->
+<div class="hub-card p-4 mb-4" style="background:linear-gradient(135deg, rgba(56,189,248,0.13), rgba(129,140,248,0.12)), var(--bg-card)">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+            <span class="badge bg-info text-dark mb-2">Interactive Architecture & Lineage · المخطط الكامل للتفرعات والعمليات</span>
+            <h1 class="h3 fw-bold mb-1">🧭 Course Mind-Map & Step-by-Step Operational Flows</h1>
+            <p class="small text-muted-hub rtl-ar mb-0">
+                استكشف إزاي كل التوبكس متفرعة وبتسلم لبعض من أول C# والـ DB لحد EF Core و ASP.NET MVC، وتابع خطوات تنفيذ كل عملية (Request Pipeline, LINQ Translation, SaveChanges, Migrations, T-SQL Order, Transactions).
+            </p>
+        </div>
+        <ul class="nav nav-pills" id="archModeTabs">
+            <li class="nav-item">
+                <button class="nav-link @(activeTab != "flows" ? "active" : "")" data-bs-toggle="tab" data-bs-target="#tabMindMap" type="button" onclick="setTimeout(redrawMindMapLines, 80)">
+                    🗺️ Topics Branching Mind-Map (@Model.Modules.Sum(m => m.Topics.Count))
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link @(activeTab == "flows" ? "active" : "")" data-bs-toggle="tab" data-bs-target="#tabFlows" type="button">
+                    ⚙️ Step-by-Step Process Flows (@Model.ProcessFlows.Count)
+                </button>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<div class="tab-content">
+    <!-- TAB 1: FULL TOPICS DEPENDENCY MIND-MAP -->
+    <div class="tab-pane fade @(activeTab != "flows" ? "show active" : "")" id="tabMindMap">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div class="d-flex flex-wrap align-items-center gap-2 small">
+                <span class="badge border" style="background:rgba(251,191,36,0.15);color:#fbbf24;border-color:#fbbf24!important">Amber = Prerequisites (متفرع من)</span>
+                <span class="badge border" style="background:rgba(56,189,248,0.15);color:#38bdf8;border-color:#38bdf8!important">Blue = Selected Topic</span>
+                <span class="badge border" style="background:rgba(52,211,153,0.15);color:#34d399;border-color:#34d399!important">Green = Unlocks / Leads To (يتفرع إلى)</span>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" onclick="clearNodeFocus()" class="btn btn-sm btn-outline-secondary">Reset Selection</button>
+                <div class="btn-group btn-group-sm">
+                    <button type="button" onclick="setZoom(1.0)" class="btn btn-outline-info">100%</button>
+                    <button type="button" onclick="setZoom(0.82)" class="btn btn-outline-info">82%</button>
+                    <button type="button" onclick="setZoom(0.65)" class="btn btn-outline-info">65%</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-lg-9">
+                <div class="mm-viewport" id="mmViewport">
+                    <div class="mm-canvas" id="mmCanvas">
+                        <svg class="mm-svg-layer" id="mmSvgLayer">
+                            <defs>
+                                <marker id="arrowDef" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+                                    <polygon points="0 0, 7 3.5, 0 7" fill="#475569" />
+                                </marker>
+                                <marker id="arrowUp" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                                    <polygon points="0 0, 8 4, 0 8" fill="#fbbf24" />
+                                </marker>
+                                <marker id="arrowDown" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                                    <polygon points="0 0, 8 4, 0 8" fill="#34d399" />
+                                </marker>
+                            </defs>
+                        </svg>
+
+                        @foreach (var mod in Model.Modules)
+                        {
+                            <div class="mm-col">
+                                <div class="mm-col-hdr" style="border-top:3px solid @mod.BadgeColor">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="badge" style="background:@(mod.BadgeColor)22;color:@mod.BadgeColor">Ch. @mod.Code</span>
+                                        <span class="small text-muted-hub">@mod.Topics.Count topics</span>
+                                    </div>
+                                    <div class="fw-bold small">@mod.TitleEn</div>
+                                    <div class="small text-info rtl-ar" style="font-size:0.74rem">@mod.TitleAr</div>
+                                </div>
+
+                                @foreach (var t in mod.Topics)
+                                {
+                                    string statusBorder = t.Status switch
+                                    {
+                                        "Mastered" => "#34d399",
+                                        "InProgress" => "#38bdf8",
+                                        "NeedsReview" => "#fbbf24",
+                                        _ => ""
+                                    };
+                                    <div class="mm-node" id="node_@t.Slug" data-slug="@t.Slug"
+                                         style="@(string.IsNullOrEmpty(statusBorder) ? "" : $"border-left:4px solid {statusBorder};")"
+                                         onclick="selectMindMapNode('@t.Slug')">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span class="text-muted-hub" style="font-size:0.68rem">@t.SessionLabel</span>
+                                            <span class="badge badge-status-@t.Status" style="font-size:0.62rem">@t.Status</span>
+                                        </div>
+                                        <div class="fw-semibold small" style="line-height:1.25">@t.TitleEn</div>
+                                        <div class="text-muted-hub rtl-ar mt-1" style="font-size:0.71rem">@t.TitleAr</div>
+                                        <div class="mt-1 d-flex justify-content-between text-muted-hub" style="font-size:0.68rem">
+                                            <span>🎬 @t.VideoCount · 📄 @t.DocCount</span>
+                                            <span>🔑 @t.TopKeys.Count</span>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Inspector Drawer -->
+            <div class="col-lg-3">
+                <div class="hub-card p-3 sticky-top" style="top:74px;z-index:10" id="mmInspector">
+                    <h2 class="h6 fw-bold text-info mb-2">🔍 Node Lineage Inspector</h2>
+                    <div id="mmInspectorBody" class="small text-muted-hub">
+                        Click any Topic card on the Mind-Map to see:
+                        <ul class="mt-2 ps-3">
+                            <li><strong>Prerequisites:</strong> What fundamentals feed into it</li>
+                            <li><strong>Branches To:</strong> Which advanced topics depend on it</li>
+                            <li><strong>Core Keys & Quick Review</strong> link</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: STEP-BY-STEP OPERATIONAL FLOW DIAGRAMS -->
+    <div class="tab-pane fade @(activeTab == "flows" ? "show active" : "")" id="tabFlows">
+        <div class="row g-4">
+            <div class="col-lg-4">
+                <div class="hub-card p-3 sticky-top" style="top:74px;z-index:10">
+                    <h2 class="h6 fw-bold mb-2">⚙️ Select Process Blueprint (@Model.ProcessFlows.Count)</h2>
+                    <div class="d-flex flex-column gap-2" id="flowSelectorList">
+                        @foreach (var flow in Model.ProcessFlows)
+                        {
+                            bool isAct = flow.Id == activeFlowId;
+                            <button type="button" id="flowBtn_@flow.Id"
+                                    onclick="switchProcessFlow('@flow.Id')"
+                                    class="btn btn-sm text-start p-2 border @(isAct ? "border-info" : "")"
+                                    style="background:@(isAct ? "rgba(56,189,248,0.12)" : "var(--bg)");color:var(--text);border-color:@(isAct ? "var(--accent)" : "var(--border)")!important">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="badge" style="background:@(flow.AccentColor)22;color:@flow.AccentColor">@flow.Category</span>
+                                    <small class="text-muted-hub">@flow.Steps.Count steps</small>
+                                </div>
+                                <div class="fw-semibold small">@flow.TitleEn</div>
+                                <div class="text-muted-hub rtl-ar" style="font-size:0.72rem">@flow.TitleAr</div>
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-8">
+                @foreach (var flow in Model.ProcessFlows)
+                {
+                    bool isAct = flow.Id == activeFlowId;
+                    <div class="hub-card p-4 process-flow-pane @(isAct ? "" : "d-none")" id="flowPane_@flow.Id">
+                        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3 pb-3 border-bottom" style="border-color:var(--border)!important">
+                            <div>
+                                <span class="badge mb-1" style="background:@(flow.AccentColor)22;color:@flow.AccentColor;border:1px solid @(flow.AccentColor)55">@flow.Category · @flow.Steps.Count-Step Blueprint</span>
+                                <h2 class="h4 fw-bold mb-1">@flow.TitleEn</h2>
+                                <div class="small text-info rtl-ar">@flow.OverviewAr</div>
+                            </div>
+                        </div>
+
+                        <!-- Related Topics Pills -->
+                        <div class="d-flex flex-wrap align-items-center gap-2 mb-4 small">
+                            <span class="text-muted-hub">Related Topics:</span>
+                            @foreach (var slug in flow.RelatedTopicSlugs)
+                            {
+                                <a asp-controller="Topics" asp-action="Details" asp-route-id="@slug" class="key-pill text-decoration-none">📖 @slug →</a>
+                            }
+                        </div>
+
+                        <!-- Visual Step-by-Step Vertical Diagram -->
+                        <div>
+                            @for (int i = 0; i < flow.Steps.Count; i++)
+                            {
+                                var step = flow.Steps[i];
+                                <div class="flow-step-card" style="border-left:4px solid @flow.AccentColor">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="badge" style="background:@flow.AccentColor;color:#0b1120">Step @step.StepNumber</span>
+                                        <span class="small text-info rtl-ar fw-semibold">@step.SubtitleAr</span>
+                                    </div>
+                                    <h3 class="h6 fw-bold mb-1">@step.Title</h3>
+                                    <p class="small mb-2" style="color:var(--text-muted)">@step.Details</p>
+
+                                    @if (!string.IsNullOrWhiteSpace(step.CodeSnippet))
+                                    {
+                                        <pre class="code-box ltr-code small mb-2"><code>@step.CodeSnippet</code></pre>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(step.WarningNote))
+                                    {
+                                        <div class="p-2 rounded small" style="background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.35);color:var(--warn)">
+                                            ⚠️ <strong>Watch Out:</strong> @step.WarningNote
+                                        </div>
+                                    }
+                                </div>
+                                @if (i < flow.Steps.Count - 1)
+                                {
+                                    <div class="flow-arrow-connector">↓</div>
+                                }
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+const CROSS_EDGES = @Html.Raw(JsonSerializer.Serialize(Model.CrossEdges));
+const TOPIC_META = {};
+@foreach (var mod in Model.Modules)
+{
+    foreach (var t in mod.Topics)
+    {
+        @:TOPIC_META[@Html.Raw(JsonSerializer.Serialize(t.Slug))] = @Html.Raw(JsonSerializer.Serialize(new { t.Slug, t.TitleEn, t.TitleAr, Module = $"{mod.Code} - {mod.TitleEn}", t.SessionLabel, t.Status, t.TopKeys, t.VideoCount, t.DocCount }));
+    }
+}
+
+// Also build implicit sequential edges within each module
+const ALL_EDGES = [...CROSS_EDGES];
+@foreach (var mod in Model.Modules)
+{
+    for (int i = 0; i < mod.Topics.Count - 1; i++)
+    {
+        @:ALL_EDGES.push({ FromSlug: @Html.Raw(JsonSerializer.Serialize(mod.Topics[i].Slug)), ToSlug: @Html.Raw(JsonSerializer.Serialize(mod.Topics[i + 1].Slug)), Label: "Next in Ch.@mod.Code", Kind: "seq" });
+    }
+}
+
+let currentZoom = 1.0;
+let selectedSlug = null;
+
+function setZoom(z) {
+    currentZoom = z;
+    const canvas = document.getElementById("mmCanvas");
+    if (canvas) {
+        canvas.style.transform = `scale(${z})`;
+        setTimeout(redrawMindMapLines, 60);
+    }
+}
+
+function redrawMindMapLines() {
+    const svg = document.getElementById("mmSvgLayer");
+    const canvas = document.getElementById("mmCanvas");
+    if (!svg || !canvas || canvas.offsetWidth === 0) return;
+
+    svg.setAttribute("width", canvas.scrollWidth);
+    svg.setAttribute("height", canvas.scrollHeight);
+
+    const defs = svg.querySelector("defs")?.outerHTML || "";
+    const canvasRect = canvas.getBoundingClientRect();
+    let pathsHtml = "";
+
+    const upSet = new Set();
+    const downSet = new Set();
+    if (selectedSlug) {
+        collectUpstream(selectedSlug, upSet);
+        collectDownstream(selectedSlug, downSet);
+    }
+
+    for (const e of ALL_EDGES) {
+        const elFrom = document.getElementById("node_" + e.FromSlug);
+        const elTo = document.getElementById("node_" + e.ToSlug);
+        if (!elFrom || !elTo) continue;
+
+        const r1 = elFrom.getBoundingClientRect();
+        const r2 = elTo.getBoundingClientRect();
+        // Divide by currentZoom to get SVG coordinates inside scaled mmCanvas!
+        const x1 = (r1.right - canvasRect.left) / currentZoom;
+        const y1 = (r1.top + r1.height / 2 - canvasRect.top) / currentZoom;
+        const x2 = (r2.left - canvasRect.left) / currentZoom;
+        const y2 = (r2.top + r2.height / 2 - canvasRect.top) / currentZoom;
+
+        let d;
+        if (Math.abs(r1.left - r2.left) < 40) {
+            // Same column sequential arrow (bottom to top)
+            const sx = (r1.left + r1.width / 2 - canvasRect.left) / currentZoom;
+            const sy1 = (r1.bottom - canvasRect.top) / currentZoom;
+            const sy2 = (r2.top - canvasRect.top) / currentZoom;
+            d = `M ${sx} ${sy1} L ${sx} ${sy2}`;
+        } else {
+            const dx = Math.max(40, Math.abs(x2 - x1) * 0.45);
+            d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+        }
+
+        let stroke = e.Kind === "seq" ? "rgba(100,116,139,0.45)" : (e.Kind === "future" ? "rgba(148,163,184,0.35)" : "rgba(56,189,248,0.28)");
+        let width = e.Kind === "seq" ? "1.4" : "1.8";
+        let dash = e.Kind === "future" ? "4 4" : "";
+        let marker = "url(#arrowDef)";
+        let opacity = "1";
+
+        if (selectedSlug) {
+            const touchesUp = (e.ToSlug === selectedSlug || upSet.has(e.ToSlug)) && upSet.has(e.FromSlug);
+            const touchesDown = (e.FromSlug === selectedSlug || downSet.has(e.FromSlug)) && downSet.has(e.ToSlug);
+            if (touchesUp) {
+                stroke = "#fbbf24";
+                width = "2.6";
+                marker = "url(#arrowUp)";
+            } else if (touchesDown) {
+                stroke = "#34d399";
+                width = "2.6";
+                marker = "url(#arrowDown)";
+            } else {
+                opacity = "0.1";
+            }
+        }
+
+        pathsHtml += `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${width}" ${dash ? `stroke-dasharray="${dash}"` : ""} opacity="${opacity}" marker-end="${marker}" />`;
+    }
+    svg.innerHTML = defs + pathsHtml;
+}
+
+function collectUpstream(slug, visited) {
+    for (const e of ALL_EDGES) {
+        if (e.ToSlug === slug && !visited.has(e.FromSlug)) {
+            visited.add(e.FromSlug);
+            collectUpstream(e.FromSlug, visited);
+        }
+    }
+}
+
+function collectDownstream(slug, visited) {
+    for (const e of ALL_EDGES) {
+        if (e.FromSlug === slug && !visited.has(e.ToSlug)) {
+            visited.add(e.ToSlug);
+            collectDownstream(e.ToSlug, visited);
+        }
+    }
+}
+
+function esc(s) {
+    return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function selectMindMapNode(slug) {
+    selectedSlug = slug;
+    const up = new Set();
+    const down = new Set();
+    collectUpstream(slug, up);
+    collectDownstream(slug, down);
+
+    document.querySelectorAll(".mm-node").forEach(el => {
+        const s = el.dataset.slug;
+        el.classList.remove("selected", "upstream", "downstream", "dimmed");
+        if (s === slug) el.classList.add("selected");
+        else if (up.has(s)) el.classList.add("upstream");
+        else if (down.has(s)) el.classList.add("downstream");
+        else el.classList.add("dimmed");
+    });
+
+    redrawMindMapLines();
+    renderInspector(slug);
+}
+
+function clearNodeFocus() {
+    selectedSlug = null;
+    document.querySelectorAll(".mm-node").forEach(el => {
+        el.classList.remove("selected", "upstream", "downstream", "dimmed");
+    });
+    redrawMindMapLines();
+    document.getElementById("mmInspectorBody").innerHTML = `<div class="small text-muted-hub">Click any Topic card on the Mind-Map to highlight its prerequisites and downstream branches.</div>`;
+}
+
+function renderInspector(slug) {
+    const meta = TOPIC_META[slug];
+    if (!meta) return;
+    const directParents = ALL_EDGES.filter(e => e.ToSlug === slug).map(e => ({ slug: e.FromSlug, label: e.Label }));
+    const directChildren = ALL_EDGES.filter(e => e.FromSlug === slug).map(e => ({ slug: e.ToSlug, label: e.Label }));
+
+    const parentHtml = directParents.length
+        ? directParents.map(p => `<button type="button" onclick="selectMindMapNode('${esc(p.slug)}')" class="btn btn-sm btn-outline-warning text-start w-100 mb-1" style="font-size:0.75rem">← ${esc(TOPIC_META[p.slug]?.TitleEn || p.slug)} <span class="opacity-75">(${esc(p.label)})</span></button>`).join("")
+        : `<div class="small text-muted-hub">Root foundation topic</div>`;
+
+    const childHtml = directChildren.length
+        ? directChildren.map(c => `<button type="button" onclick="selectMindMapNode('${esc(c.slug)}')" class="btn btn-sm btn-outline-success text-start w-100 mb-1" style="font-size:0.75rem">→ ${esc(TOPIC_META[c.slug]?.TitleEn || c.slug)} <span class="opacity-75">(${esc(c.label)})</span></button>`).join("")
+        : `<div class="small text-muted-hub">Leaf / Capstone topic</div>`;
+
+    const keysHtml = (meta.TopKeys || []).map(k => `<span class="key-pill critical me-1 mb-1">${esc(k)}</span>`).join("");
+
+    document.getElementById("mmInspectorBody").innerHTML = `
+        <div class="badge bg-info text-dark mb-1">${esc(meta.Module)}</div>
+        <h3 class="h6 fw-bold mb-1">${esc(meta.TitleEn)}</h3>
+        <div class="small text-info rtl-ar mb-2">${esc(meta.TitleAr)}</div>
+        <div class="small text-muted-hub mb-2">🎬 ${meta.VideoCount} videos · 📄 ${meta.DocCount} docs · Status: <strong>${esc(meta.Status)}</strong></div>
+        <div class="mb-3">${keysHtml}</div>
+        <a href="/Topics/Details/${esc(meta.Slug)}" class="btn btn-sm btn-info text-dark fw-semibold w-100 mb-3">Open Quick Review →</a>
+
+        <div class="fw-bold small text-warning mb-1">Prerequisites (متفرع من):</div>
+        <div class="mb-3">${parentHtml}</div>
+
+        <div class="fw-bold small text-success mb-1">Branches Into (بيوصلك لـ):</div>
+        <div>${childHtml}</div>
+    `;
+}
+
+function switchProcessFlow(flowId) {
+    document.querySelectorAll(".process-flow-pane").forEach(el => el.classList.add("d-none"));
+    document.getElementById("flowPane_" + flowId)?.classList.remove("d-none");
+
+    document.querySelectorAll("#flowSelectorList button").forEach(btn => {
+        const active = btn.id === "flowBtn_" + flowId;
+        btn.classList.toggle("border-info", active);
+        btn.style.background = active ? "rgba(56,189,248,0.12)" : "var(--bg)";
+    });
+}
+
+window.addEventListener("load", redrawMindMapLines);
+window.addEventListener("resize", () => setTimeout(redrawMindMapLines, 80));
+</script>
+}

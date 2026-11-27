@@ -1,0 +1,155 @@
+@model RouteRevisionHub.Controllers.TakeExamViewModel
+@{
+    ViewData["Title"] = Model.Exam.Title;
+    int totalSeconds = Model.Exam.TimeLimitMinutes * 60;
+}
+
+<!-- Sticky Timer Header -->
+<div class="hub-card p-3 mb-4 sticky-top" style="top:68px;z-index:20;background:var(--bg-elev)">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+            <span class="badge bg-warning text-dark me-2">Timed Assessment · Pass @Model.Exam.PassingScorePercent%</span>
+            <strong class="h5 align-middle">@Model.Exam.Title</strong>
+            <div class="small text-muted-hub">@Model.Questions.Count Questions · Time Limit: @Model.Exam.TimeLimitMinutes minutes</div>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <div class="text-end">
+                <div class="small text-muted-hub">Time Remaining</div>
+                <div id="examTimerDisplay" class="h4 fw-bold font-monospace text-info mb-0">@TimeSpan.FromSeconds(totalSeconds).ToString(@"mm\:ss")</div>
+            </div>
+            <button id="btnSubmitExam" type="button" onclick="submitTimedExam()" class="btn btn-success fw-semibold">Submit Exam ✓</button>
+        </div>
+    </div>
+</div>
+
+@if (!Model.Questions.Any())
+{
+    <div class="hub-card p-4 text-center text-muted-hub">
+        No questions found for this exam yet. <a asp-action="Index" class="text-info">Return to Exams Hub & add questions</a>.
+    </div>
+}
+else
+{
+    <div class="d-flex flex-column gap-3" id="examQuestionsContainer">
+        @for (int i = 0; i < Model.Questions.Count; i++)
+        {
+            var q = Model.Questions[i];
+            <div class="hub-card p-4 exam-q-block" data-qid="@q.Id" data-has-opts="@(q.Options.Any() ? "1" : "0")">
+                <div class="d-flex justify-content-between align-items-center small mb-2">
+                    <span class="badge bg-info text-dark">Question @(i + 1) of @Model.Questions.Count · @q.QuestionType</span>
+                    <span class="text-muted-hub">@q.TopicTitle</span>
+                </div>
+                <h2 class="h6 fw-bold mb-3">@q.Prompt</h2>
+                @if (!string.IsNullOrWhiteSpace(q.CodeBlock))
+                {
+                    <pre class="code-box ltr-code mb-3 small"><code>@q.CodeBlock</code></pre>
+                }
+
+                @if (q.Options.Any())
+                {
+                    <div class="d-flex flex-column gap-2">
+                        @foreach (var opt in q.Options)
+                        {
+                            <label class="flashcard-option d-flex align-items-center gap-2 m-0" style="cursor:pointer">
+                                <input type="radio" name="q_@q.Id" value="@opt" class="form-check-input m-0 flex-shrink-0" />
+                                <span class="small">@opt</span>
+                            </label>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <textarea class="form-control form-control-sm hub-input mb-2" rows="2" placeholder="Write your answer / key points mentally or here before checking..."></textarea>
+                    <details class="mb-2">
+                        <summary class="small text-info" style="cursor:pointer">Reveal Model Answer to Self-Grade</summary>
+                        <div class="p-2 mt-2 rounded border border-info small" style="background:var(--bg)">
+                            <strong class="text-success">Model Answer:</strong> @q.CorrectAnswer
+                            @if (!string.IsNullOrWhiteSpace(q.Explanation))
+                            {
+                                <div class="text-muted-hub mt-1">@q.Explanation</div>
+                            }
+                        </div>
+                    </details>
+                    <div class="d-flex gap-3 small">
+                        <label class="text-success" style="cursor:pointer">
+                            <input type="radio" name="self_@q.Id" value="1" class="form-check-input me-1" /> ✓ I got this right
+                        </label>
+                        <label class="text-danger" style="cursor:pointer">
+                            <input type="radio" name="self_@q.Id" value="0" class="form-check-input me-1" checked /> ✗ Mark for review
+                        </label>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="mt-4 text-end">
+        <button type="button" onclick="submitTimedExam()" class="btn btn-success btn-lg fw-semibold">Finish & Grade Exam ✓</button>
+    </div>
+}
+
+@section Scripts {
+<script>
+const TOTAL_LIMIT = @totalSeconds;
+let remaining = TOTAL_LIMIT;
+let submitted = false;
+
+const timerEl = document.getElementById("examTimerDisplay");
+const timerInterval = setInterval(() => {
+    if (submitted) return;
+    remaining = Math.max(0, remaining - 1);
+    const m = Math.floor(remaining / 60).toString().padStart(2, "0");
+    const s = (remaining % 60).toString().padStart(2, "0");
+    if (timerEl) {
+        timerEl.textContent = `${m}:${s}`;
+        if (remaining <= 60) {
+            timerEl.classList.remove("text-info", "text-warning");
+            timerEl.classList.add("text-danger");
+        } else if (remaining <= 120) {
+            timerEl.classList.remove("text-info");
+            timerEl.classList.add("text-warning");
+        }
+    }
+    if (remaining === 0) {
+        clearInterval(timerInterval);
+        submitTimedExam();
+    }
+}, 1000);
+
+async function submitTimedExam() {
+    if (submitted) return;
+    submitted = true;
+    clearInterval(timerInterval);
+    const btn = document.getElementById("btnSubmitExam");
+    if (btn) { btn.disabled = true; btn.textContent = "Grading..."; }
+
+    const blocks = document.querySelectorAll(".exam-q-block");
+    const answers = [];
+    blocks.forEach(b => {
+        const qid = parseInt(b.dataset.qid, 10);
+        const hasOpts = b.dataset.hasOpts === "1";
+        if (hasOpts) {
+            const picked = b.querySelector(`input[name="q_${qid}"]:checked`);
+            answers.push({ questionId: qid, selectedAnswer: picked ? picked.value : "", selfMarkedCorrect: null });
+        } else {
+            const selfOk = b.querySelector(`input[name="self_${qid}"][value="1"]:checked`);
+            answers.push({ questionId: qid, selectedAnswer: "", selfMarkedCorrect: !!selfOk });
+        }
+    });
+
+    const elapsed = TOTAL_LIMIT - remaining;
+    const resp = await fetch(`/api/exams/@Model.Exam.Id/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ durationSecondsUsed: elapsed, answers })
+    });
+    if (resp.ok) {
+        const res = await resp.json();
+        window.location.href = `/Exams/Result/${res.submissionId}`;
+    } else {
+        submitted = false;
+        if (btn) { btn.disabled = false; btn.textContent = "Submit Exam ✓"; }
+    }
+}
+</script>
+}

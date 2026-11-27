@@ -1,0 +1,180 @@
+﻿@model RouteRevisionHub.ViewModels.DashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+    var overallPct = Model.TotalTopics == 0 ? 0 : (int)Math.Round(Model.MasteredTopics * 100.0 / Model.TotalTopics);
+    var quizPct = Model.QuizTotalCount == 0 ? 0 : (int)Math.Round(Model.QuizCorrectCount * 100.0 / Model.QuizTotalCount);
+}
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-8">
+        <div class="hub-card p-4 h-100 d-flex flex-column justify-content-between" style="background:linear-gradient(135deg, rgba(14,165,233,0.14), rgba(99,102,241,0.12)), var(--bg-card)">
+            <div>
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+                    <div>
+                        <span class="badge bg-info text-dark mb-2">Route Academy Backend Track · 100% Offline Ready</span>
+                        <h1 class="h3 fw-bold mb-1">C# · OOP · SQL Server · LINQ · EF Core · ASP.NET Core MVC</h1>
+                        <p class="rtl-ar text-muted-hub mb-0">
+                            خريطة المراجعة الكاملة لماتريال كورس Route — كل توبيك معاه الـ Convention Keys، ملخص سريع بالعربي والانجليزي، وربط مباشر بأرقام السلايدز وأكواد الـ SQL/C# وتوقيتات الفيديوهات بالثانية.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-3 pt-3 border-top" style="border-color:var(--border)!important">
+                <div class="d-flex justify-content-between align-items-center mb-1 small">
+                    <span>Overall Revision Progress (@Model.MasteredTopics / @Model.TotalTopics Topics Mastered)</span>
+                    <strong class="text-info">@overallPct%</strong>
+                </div>
+                <div class="progress" style="height:10px;background:var(--bg)">
+                    <div class="progress-bar bg-success" style="width:@overallPct%"></div>
+                </div>
+                <div class="d-flex flex-wrap gap-2 mt-3">
+                    <a asp-controller="Home" asp-action="Roadmap" class="btn btn-info btn-sm text-dark fw-semibold">Explore Full Roadmap</a>
+                    <a asp-controller="Architecture" asp-action="Index" class="btn btn-outline-info btn-sm fw-semibold">🧭 Mind-Map & Process Flows</a>
+                    <a asp-controller="Checklist" asp-action="Index" class="btn btn-success btn-sm fw-semibold">✓ Study Checklist · متابعة الإنجاز</a>
+                    <a asp-controller="Topics" asp-action="Conventions" class="btn btn-outline-warning btn-sm">Convention Keys Cheat Sheet (@Model.TotalConventionKeys)</a>
+                    <a asp-controller="Topics" asp-action="Quiz" class="btn btn-outline-light btn-sm">Start Quiz Arena (@Model.TotalQuestions Qs)</a>
+                    <a asp-controller="Exams" asp-action="Index" class="btn btn-warning btn-sm text-dark fw-semibold">🏆 Chapter Exams & Deadlines</a>
+                    <a asp-controller="Resources" asp-action="Index" class="btn btn-outline-secondary btn-sm">Browse All @Model.TotalResources Files</a>
+                    <a asp-controller="Expand" asp-action="Index" class="btn btn-outline-success btn-sm">⚡ Sync Folder / Add Topic</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="row g-2 h-100">
+            <div class="col-6">
+                <div class="hub-card p-3 h-100">
+                    <div class="small text-muted-hub">Indexed Videos & Audio</div>
+                    <div class="h3 fw-bold text-info mb-0">@Model.TotalVideos</div>
+                    <div class="small text-muted-hub">@Model.TotalVideoHours hrs OCR-indexed</div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="hub-card p-3 h-100">
+                    <div class="small text-muted-hub">Total Course Files</div>
+                    <div class="h3 fw-bold mb-0" style="color:var(--accent-2)">@Model.TotalResources</div>
+                    <div class="small text-muted-hub">PPTX · PDF · SQL · CS · ZIP</div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="hub-card p-3 h-100">
+                    <div class="small text-muted-hub">Convention Keys</div>
+                    <div class="h3 fw-bold text-warning mb-0">@Model.TotalConventionKeys</div>
+                    <div class="small text-muted-hub">Across @Model.TotalTopics topics</div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="hub-card p-3 h-100">
+                    <div class="small text-muted-hub">Quiz & Flashcards</div>
+                    <div class="h3 fw-bold text-success mb-0">@(Model.QuizTotalCount > 0 ? $"{quizPct}%" : $"{Model.TotalQuestions}")</div>
+                    <div class="small text-muted-hub">@(Model.QuizTotalCount > 0 ? $"{Model.QuizCorrectCount}/{Model.QuizTotalCount} correct" : "Ready to practice")</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Track Modules Grid -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 fw-bold mb-0">Track Modules & Student Guide Coverage</h2>
+    <span class="small text-muted-hub">@Model.NeedsReviewTopics needs review · @Model.InProgressTopics in progress</span>
+</div>
+
+<div class="row g-3 mb-4">
+    @foreach (var m in Model.Modules)
+    {
+        <div class="col-md-6 col-xl-4">
+            <a asp-controller="Home" asp-action="Roadmap" asp-route-moduleId="@m.Id" class="text-decoration-none" style="color:inherit">
+                <div class="hub-card hub-card-hover p-3 h-100 d-flex flex-column justify-content-between">
+                    <div>
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                            <span class="badge" style="background:@(m.BadgeColor)22;color:@m.BadgeColor;border:1px solid @(m.BadgeColor)55">Module @m.Code</span>
+                            @if (m.IsUpcoming)
+                            {
+                                <span class="badge bg-secondary">Upcoming (Student Guide)</span>
+                            }
+                            else
+                            {
+                                <span class="small text-muted-hub">@m.MasteredCount/@m.TopicCount mastered</span>
+                            }
+                        </div>
+                        <h3 class="h6 fw-bold mb-1">@m.TitleEn</h3>
+                        <div class="small text-info rtl-ar mb-2">@m.TitleAr</div>
+                        <p class="small text-muted-hub mb-2">@m.Description</p>
+                    </div>
+                    <div>
+                        <div class="progress mb-2" style="height:6px;background:var(--bg)">
+                            <div class="progress-bar" style="width:@m.ProgressPercent%;background:@m.BadgeColor"></div>
+                        </div>
+                        <div class="d-flex justify-content-between small text-muted-hub">
+                            <span>@m.TopicCount topics · @m.ConventionKeyCount keys</span>
+                            <span>@(m.IsUpcoming ? "Syllabus preview" : $"{m.TotalVideoCount} videos ({m.TotalVideoHours:0.#}h)")</span>
+                        </div>
+                    </div>
+                </div>
+            </a>
+        </div>
+    }
+</div>
+
+<!-- Interview Critical & Needs Review -->
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h2 class="h5 fw-bold mb-0">High-Priority Interview & Revision Topics</h2>
+            <a asp-controller="Home" asp-action="Roadmap" asp-route-priority="InterviewCritical" class="small text-info text-decoration-none">View all →</a>
+        </div>
+        <div class="row g-2">
+            @foreach (var t in Model.PriorityTopics)
+            {
+                <div class="col-md-6">
+                    <a asp-controller="Topics" asp-action="Details" asp-route-id="@t.Slug" class="text-decoration-none" style="color:inherit">
+                        <div class="hub-card hub-card-hover p-3 h-100">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="badge" style="background:@(t.BadgeColor)22;color:@t.BadgeColor">@t.ModuleCode · @t.SessionLabel</span>
+                                <span class="badge badge-status-@t.Status">@t.Status</span>
+                            </div>
+                            <div class="fw-bold">@t.TitleEn</div>
+                            <div class="small text-muted-hub rtl-ar mb-2">@t.TitleAr</div>
+                            <div class="d-flex flex-wrap gap-1 mb-2">
+                                @foreach (var k in t.TopKeys)
+                                {
+                                    <span class="key-pill critical">@k</span>
+                                }
+                            </div>
+                            <div class="small text-muted-hub">
+                                🎬 @t.VideoCount videos · 📌 @t.SourceCount sources · ❓ @t.QuestionCount Qs
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <h2 class="h5 fw-bold mb-2">In Progress / Needs Review</h2>
+        @if (!Model.WeakOrRecentTopics.Any())
+        {
+            <div class="hub-card p-3 small text-muted-hub">
+                Open any topic and update its status to <strong>InProgress</strong> or <strong>NeedsReview</strong> to build your personal quick-revision queue here.
+            </div>
+        }
+        else
+        {
+            @foreach (var t in Model.WeakOrRecentTopics)
+            {
+                <a asp-controller="Topics" asp-action="Details" asp-route-id="@t.Slug" class="text-decoration-none d-block mb-2" style="color:inherit">
+                    <div class="hub-card hub-card-hover p-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <strong>@t.TitleEn</strong>
+                            <span class="badge badge-status-@t.Status">@t.Status</span>
+                        </div>
+                        <div class="small text-muted-hub">@t.ModuleTitleEn · Confidence @t.ConfidenceLevel/5</div>
+                    </div>
+                </a>
+            }
+        }
+    </div>
+</div>

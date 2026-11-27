@@ -1,0 +1,82 @@
+@model RouteRevisionHub.ViewModels.QuizArenaViewModel
+@{
+    ViewData["Title"] = "Quiz Arena & Flashcards";
+}
+
+<h1 class="h3 fw-bold mb-1">🧠 Quick Review Quiz Arena & Question Bank</h1>
+<p class="small text-muted-hub mb-3">Grounded in Route Academy Quick Checks, Mini Exercises, Question Banks, and Exams — all answers saved to MS SQL Server.</p>
+
+<form method="get" asp-action="Quiz" class="hub-card p-3 mb-4">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-5">
+            <label class="form-label small text-muted-hub mb-1">Track Module</label>
+            <select name="moduleId" class="form-select form-select-sm hub-select">
+                <option value="">All Modules</option>
+                @foreach (var m in Model.Modules)
+                {
+                    <option value="@m.Id" selected="@(Model.ModuleId == m.Id)">@m.Code - @m.TitleEn</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small text-muted-hub mb-1">Question Type</label>
+            <select name="type" class="form-select form-select-sm hub-select">
+                <option value="">All Types</option>
+                @foreach (var qt in new[] { "MCQ", "TrueFalse", "Output", "SQL", "Interview" })
+                {
+                    <option value="@qt" selected="@(Model.QuestionType == qt)">@qt</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3 d-flex gap-2">
+            <button type="submit" class="btn btn-info btn-sm text-dark fw-semibold flex-grow-1">Load Questions (@Model.Questions.Count)</button>
+            <a asp-action="Quiz" class="btn btn-outline-secondary btn-sm">All</a>
+        </div>
+    </div>
+</form>
+
+<div class="row g-3">
+    @foreach (var q in Model.Questions)
+    {
+        <div class="col-lg-6">
+            <div class="quiz-card hub-card p-3 h-100">
+                <div class="d-flex justify-content-between align-items-center small mb-2">
+                    <a asp-controller="Topics" asp-action="Details" asp-route-id="@q.TopicSlug" class="text-info text-decoration-none">
+                        [@q.ModuleCode] @q.TopicTitle →
+                    </a>
+                    <span class="badge bg-secondary">@q.QuestionType</span>
+                </div>
+                <div class="fw-bold mb-2">@q.Prompt</div>
+                @if (!string.IsNullOrWhiteSpace(q.CodeBlock))
+                {
+                    <pre class="code-box ltr-code mb-2 small"><code>@q.CodeBlock</code></pre>
+                }
+                @if (q.Options.Any())
+                {
+                    <div class="d-grid gap-2">
+                        @foreach (var opt in q.Options)
+                        {
+                            <button type="button" class="flashcard-option small" data-option="@opt"
+                                    onclick='submitQuizChoice(@q.Id, this, @Html.Raw(System.Text.Json.JsonSerializer.Serialize(opt)))'>
+                                @opt
+                            </button>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <details class="mt-2">
+                        <summary class="text-info small" style="cursor:pointer">Reveal Answer & Source</summary>
+                        <div class="mt-2 small text-success"><strong>Answer:</strong> @q.CorrectAnswer</div>
+                        @if (!string.IsNullOrWhiteSpace(q.Explanation))
+                        {
+                            <div class="small text-muted-hub mt-1">@q.Explanation</div>
+                        }
+                    </details>
+                }
+                <div class="small text-muted-hub mt-2">📌 @q.SourceCitation</div>
+                <div class="quiz-feedback d-none"></div>
+            </div>
+        </div>
+    }
+</div>
